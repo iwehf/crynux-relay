@@ -52,10 +52,9 @@ type AppConfig struct {
 			GenesisTokenAmount uint64 `mapstructure:"genesis_token_amount" description:"genesis token amount, in ether unit"`
 		} `mapstructure:"account"`
 		Contracts struct {
-			Netstats string `mapstructure:"netstats"`
-			Task     string `mapstructure:"task"`
-			Node     string `mapstructure:"node"`
-			QoS      string `mapstructure:"qos"`
+			BenefitAddress string `mapstructure:"benefit_address"`
+			NodeStaking    string `mapstructure:"node_staking"`
+			Credits        string `mapstructure:"credits"`
 		} `mapstructure:"contracts"`
 	} `mapstructure:"blockchain"`
 

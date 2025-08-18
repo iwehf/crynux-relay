@@ -26,10 +26,9 @@ var ethRpcClient *ethclient.Client
 var chainID *big.Int
 var gasPrice *big.Int
 
-var taskContractInstance *bindings.Task
-var nodeContractInstance *bindings.Node
-var netstatsContractInstance *bindings.NetworkStats
-var qosContractInstance *bindings.QOS
+var benefitAddressContractInstance *bindings.BenefitAddress
+var nodeStakingContractInstance *bindings.NodeStaking
+var creditsContractInstance *bindings.Credits
 
 func GetRpcClient() *ethclient.Client {
 	if ethRpcClient == nil {
@@ -38,32 +37,25 @@ func GetRpcClient() *ethclient.Client {
 	return ethRpcClient
 }
 
-func GetTaskContractInstance() *bindings.Task {
-	if taskContractInstance == nil {
-		log.Panicln("task contract instance is nil")
+func GetBenefitAddressContractInstance() *bindings.BenefitAddress {
+	if benefitAddressContractInstance == nil {
+		log.Panicln("benefit address contract instance is nil")
 	}
-	return taskContractInstance
+	return benefitAddressContractInstance
 }
 
-func GetNodeContractInstance() *bindings.Node {
-	if nodeContractInstance == nil {
-		log.Panicln("node contract instance is nil")
+func GetNodeStakingContractInstance() *bindings.NodeStaking {
+	if nodeStakingContractInstance == nil {
+		log.Panicln("node staking contract instance is nil")
 	}
-	return nodeContractInstance
+	return nodeStakingContractInstance
 }
 
-func GetNetstatsContractInstance() *bindings.NetworkStats {
-	if netstatsContractInstance == nil {
-		log.Panicln("netstats contract instance is nil")
+func GetCreditsContractInstance() *bindings.Credits {
+	if creditsContractInstance == nil {
+		log.Panicln("credits contract instance is nil")
 	}
-	return netstatsContractInstance
-}
-
-func GetQoSContractInstance() *bindings.QOS {
-	if qosContractInstance == nil {
-		log.Panicln("qos contract instance is nil")
-	}
-	return qosContractInstance
+	return creditsContractInstance
 }
 
 func getGasPrice() *big.Int {
@@ -85,16 +77,16 @@ func Init(ctx context.Context) error {
 	if err := initEthRpcClient(appConfig.Blockchain.RpcEndpoint); err != nil {
 		return err
 	}
-	if err := initTaskContractInstance(appConfig.Blockchain.Contracts.Task); err != nil {
+		if err := initBenefitAddressContractInstance(appConfig.Blockchain.Contracts.BenefitAddress); err != nil {
 		return err
 	}
-	if err := initNodeContractAddress(appConfig.Blockchain.Contracts.Node); err != nil {
+	if err := initNodeStakingContractInstance(appConfig.Blockchain.Contracts.NodeStaking); err != nil {
 		return err
 	}
-	if err := initNetstatsContractAddress(appConfig.Blockchain.Contracts.Netstats); err != nil {
+	if err := initCreditsContractInstance(appConfig.Blockchain.Contracts.Credits); err != nil {
 		return err
 	}
-	if err := initQosContractInstance(appConfig.Blockchain.Contracts.QoS); err != nil {
+	if err := initChainID(ctx, appConfig.Blockchain.ChainID); err != nil {
 		return err
 	}
 	if err := initChainID(ctx, appConfig.Blockchain.ChainID); err != nil {
@@ -115,43 +107,33 @@ func initEthRpcClient(endpoint string) error {
 	return nil
 }
 
-func initTaskContractInstance(taskContractAddress string) error {
+func initBenefitAddressContractInstance(benefitAddressContractAddress string) error {
 	client := GetRpcClient()
-	taskInstance, err := bindings.NewTask(common.HexToAddress(taskContractAddress), client)
+	benefitAddressInstance, err := bindings.NewBenefitAddress(common.HexToAddress(benefitAddressContractAddress), client)
 	if err != nil {
 		return err
 	}
-	taskContractInstance = taskInstance
+	benefitAddressContractInstance = benefitAddressInstance
 	return nil
 }
 
-func initNodeContractAddress(nodeContractAddress string) error {
+func initNodeStakingContractInstance(nodeStakingContractAddress string) error {
 	client := GetRpcClient()
-	nodeInstance, err := bindings.NewNode(common.HexToAddress(nodeContractAddress), client)
+	nodeStakingInstance, err := bindings.NewNodeStaking(common.HexToAddress(nodeStakingContractAddress), client)
 	if err != nil {
 		return err
 	}
-	nodeContractInstance = nodeInstance
+	nodeStakingContractInstance = nodeStakingInstance
 	return nil
 }
 
-func initNetstatsContractAddress(netstatsContractAddress string) error {
+func initCreditsContractInstance(creditsContractAddress string) error {
 	client := GetRpcClient()
-	netstatsInstance, err := bindings.NewNetworkStats(common.HexToAddress(netstatsContractAddress), client)
+	creditsInstance, err := bindings.NewCredits(common.HexToAddress(creditsContractAddress), client)
 	if err != nil {
 		return err
 	}
-	netstatsContractInstance = netstatsInstance
-	return nil
-}
-
-func initQosContractInstance(qosContractAddress string) error {
-	client := GetRpcClient()
-	qosInstance, err := bindings.NewQOS(common.HexToAddress(qosContractAddress), client)
-	if err != nil {
-		return err
-	}
-	qosContractInstance = qosInstance
+	creditsContractInstance = creditsInstance
 	return nil
 }
 
