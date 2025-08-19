@@ -49,6 +49,8 @@ func main() {
 	if err := service.InitSelectingProb(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
+	tm := blockchain.NewTransactionManager(config.GetDB())
+	tm.Start(context.Background())
 	go service.StartTaskProcesser(context.Background())
 	go service.StartBalanceSync(context.Background(), config.GetDB())
 	// go tasks.ProcessTasks(context.Background())

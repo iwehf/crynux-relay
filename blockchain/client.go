@@ -5,10 +5,13 @@ import (
 	"context"
 	"crynux_relay/blockchain/bindings"
 	"crynux_relay/config"
+	"database/sql"
 	"errors"
 	"math/big"
 	"strconv"
 	"time"
+
+	"crynux_relay/models"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -19,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 var ethRpcClient *ethclient.Client
@@ -77,7 +81,7 @@ func Init(ctx context.Context) error {
 	if err := initEthRpcClient(appConfig.Blockchain.RpcEndpoint); err != nil {
 		return err
 	}
-		if err := initBenefitAddressContractInstance(appConfig.Blockchain.Contracts.BenefitAddress); err != nil {
+	if err := initBenefitAddressContractInstance(appConfig.Blockchain.Contracts.BenefitAddress); err != nil {
 		return err
 	}
 	if err := initNodeStakingContractInstance(appConfig.Blockchain.Contracts.NodeStaking); err != nil {
@@ -201,6 +205,7 @@ func GetAuth(ctx context.Context, address common.Address, privateKeyStr string) 
 	return auth, nil
 }
 
+
 func WaitTxReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	deadline, hasDeadline := ctx.Deadline()
 	client := GetRpcClient()
@@ -263,6 +268,26 @@ func SendETH(ctx context.Context, from common.Address, to common.Address, amount
 
 	addNonce(nonce)
 	return signedTx, nil
+}
+
+// QueueSendETH queues a send ETH transaction to be sent later
+func QueueSendETH(ctx context.Context, db *gorm.DB, from common.Address, to common.Address, amount *big.Int) (*models.BlockchainTransaction, error) {
+	transaction := &models.BlockchainTransaction{
+		Type:        "SendETH",
+		Status:      models.TransactionStatusPending,
+		FromAddress: from.Hex(),
+		ToAddress: sql.NullString{
+			String: to.Hex(),
+			Valid:  true,
+		},
+		Value: amount.String(),
+	}
+
+	if err := transaction.Save(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
 }
 
 func GetErrorMessageFromReceipt(ctx context.Context, receipt *types.Receipt) (string, error) {

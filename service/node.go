@@ -2,25 +2,29 @@ package service
 
 import (
 	"context"
-	"crynux_relay/config"
+	"crynux_relay/blockchain"
 	"crynux_relay/models"
 	"database/sql"
 	"errors"
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, modelIDs []string) error {
-	appConfig := config.GetConfig()
+	stakingInfo, err := blockchain.GetStakingInfo(ctx, common.HexToAddress(node.Address))
+	if err != nil {
+		return err
+	}
+	stakingAmount := new(big.Int).Add(stakingInfo.StakedBalance, stakingInfo.StakedCredits)
+	if stakingAmount.Cmp(&node.StakeAmount.Int) != 0 {
+		return errors.New("staking amount mismatch")
+	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := Transfer(ctx, tx, node.Address, appConfig.Blockchain.Account.Address, &node.StakeAmount.Int)
-		if err != nil {
-			return err
-		}
 		node.Status = models.NodeStatusAvailable
 		node.JoinTime = time.Now()
 		if err := node.Save(ctx, tx); err != nil {
@@ -48,27 +52,16 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 			return err
 		}
 		UpdateMaxStaking(&node.StakeAmount.Int)
-		commitFunc()
 		return nil
 	})
 }
 
 func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slashed bool) error {
-	appConfig := config.GetConfig()
-
 	err := db.Transaction(func(tx *gorm.DB) error {
-		var commitFunc func()
 		// delete all node local models
 		err := tx.Where("node_address = ?", node.Address).Delete(&models.NodeModel{}).Error
 		if err != nil {
 			return err
-		}
-
-		if !slashed {
-			commitFunc, err = Transfer(ctx, tx, appConfig.Blockchain.Account.Address, node.Address, &node.StakeAmount.Int)
-			if err != nil {
-				return err
-			}
 		}
 
 		if err := node.Update(ctx, tx, map[string]interface{}{
@@ -82,9 +75,15 @@ func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slas
 		if err := RefreshMaxStaking(ctx, tx); err != nil {
 			return err
 		}
-		if commitFunc != nil {
-			commitFunc()
-		}	
+		if slashed {
+			if _, err := blockchain.QueueSlashStaking(ctx, tx, common.HexToAddress(node.Address)); err != nil {
+				return err
+			}
+		} else {
+			if _, err := blockchain.QueueUnstake(ctx, tx, common.HexToAddress(node.Address)); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {

@@ -31,7 +31,7 @@ var (
 
 // CreditsMetaData contains all meta data concerning the Credits contract.
 var CreditsMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"fromAddr\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"toAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsBought\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsStaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsUnstaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"buyCredits\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"buyCreditsFor\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllCreditAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllCredits\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"getCredits\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setStakingAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"stakeCredits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"unstakeCredits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"fromAddr\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"toAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsBought\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsStaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"CreditsUnstaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"createCredits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllCreditAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllCredits\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"getCredits\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setAdminAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setStakingAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"stakeCredits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"unstakeCredits\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
 // CreditsABI is the input ABI used to generate the binding from.
@@ -305,46 +305,25 @@ func (_Credits *CreditsCallerSession) Owner() (common.Address, error) {
 	return _Credits.Contract.Owner(&_Credits.CallOpts)
 }
 
-// BuyCredits is a paid mutator transaction binding the contract method 0x0c4dfe3f.
+// CreateCredits is a paid mutator transaction binding the contract method 0x63307643.
 //
-// Solidity: function buyCredits(uint256 amount) payable returns()
-func (_Credits *CreditsTransactor) BuyCredits(opts *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
-	return _Credits.contract.Transact(opts, "buyCredits", amount)
+// Solidity: function createCredits(address addr, uint256 amount) returns()
+func (_Credits *CreditsTransactor) CreateCredits(opts *bind.TransactOpts, addr common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _Credits.contract.Transact(opts, "createCredits", addr, amount)
 }
 
-// BuyCredits is a paid mutator transaction binding the contract method 0x0c4dfe3f.
+// CreateCredits is a paid mutator transaction binding the contract method 0x63307643.
 //
-// Solidity: function buyCredits(uint256 amount) payable returns()
-func (_Credits *CreditsSession) BuyCredits(amount *big.Int) (*types.Transaction, error) {
-	return _Credits.Contract.BuyCredits(&_Credits.TransactOpts, amount)
+// Solidity: function createCredits(address addr, uint256 amount) returns()
+func (_Credits *CreditsSession) CreateCredits(addr common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _Credits.Contract.CreateCredits(&_Credits.TransactOpts, addr, amount)
 }
 
-// BuyCredits is a paid mutator transaction binding the contract method 0x0c4dfe3f.
+// CreateCredits is a paid mutator transaction binding the contract method 0x63307643.
 //
-// Solidity: function buyCredits(uint256 amount) payable returns()
-func (_Credits *CreditsTransactorSession) BuyCredits(amount *big.Int) (*types.Transaction, error) {
-	return _Credits.Contract.BuyCredits(&_Credits.TransactOpts, amount)
-}
-
-// BuyCreditsFor is a paid mutator transaction binding the contract method 0xcfa66519.
-//
-// Solidity: function buyCreditsFor(address addr, uint256 amount) payable returns()
-func (_Credits *CreditsTransactor) BuyCreditsFor(opts *bind.TransactOpts, addr common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Credits.contract.Transact(opts, "buyCreditsFor", addr, amount)
-}
-
-// BuyCreditsFor is a paid mutator transaction binding the contract method 0xcfa66519.
-//
-// Solidity: function buyCreditsFor(address addr, uint256 amount) payable returns()
-func (_Credits *CreditsSession) BuyCreditsFor(addr common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Credits.Contract.BuyCreditsFor(&_Credits.TransactOpts, addr, amount)
-}
-
-// BuyCreditsFor is a paid mutator transaction binding the contract method 0xcfa66519.
-//
-// Solidity: function buyCreditsFor(address addr, uint256 amount) payable returns()
-func (_Credits *CreditsTransactorSession) BuyCreditsFor(addr common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _Credits.Contract.BuyCreditsFor(&_Credits.TransactOpts, addr, amount)
+// Solidity: function createCredits(address addr, uint256 amount) returns()
+func (_Credits *CreditsTransactorSession) CreateCredits(addr common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _Credits.Contract.CreateCredits(&_Credits.TransactOpts, addr, amount)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -366,6 +345,27 @@ func (_Credits *CreditsSession) RenounceOwnership() (*types.Transaction, error) 
 // Solidity: function renounceOwnership() returns()
 func (_Credits *CreditsTransactorSession) RenounceOwnership() (*types.Transaction, error) {
 	return _Credits.Contract.RenounceOwnership(&_Credits.TransactOpts)
+}
+
+// SetAdminAddress is a paid mutator transaction binding the contract method 0x2c1e816d.
+//
+// Solidity: function setAdminAddress(address addr) returns()
+func (_Credits *CreditsTransactor) SetAdminAddress(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+	return _Credits.contract.Transact(opts, "setAdminAddress", addr)
+}
+
+// SetAdminAddress is a paid mutator transaction binding the contract method 0x2c1e816d.
+//
+// Solidity: function setAdminAddress(address addr) returns()
+func (_Credits *CreditsSession) SetAdminAddress(addr common.Address) (*types.Transaction, error) {
+	return _Credits.Contract.SetAdminAddress(&_Credits.TransactOpts, addr)
+}
+
+// SetAdminAddress is a paid mutator transaction binding the contract method 0x2c1e816d.
+//
+// Solidity: function setAdminAddress(address addr) returns()
+func (_Credits *CreditsTransactorSession) SetAdminAddress(addr common.Address) (*types.Transaction, error) {
+	return _Credits.Contract.SetAdminAddress(&_Credits.TransactOpts, addr)
 }
 
 // SetStakingAddress is a paid mutator transaction binding the contract method 0xf4e0d9ac.

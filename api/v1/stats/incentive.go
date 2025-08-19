@@ -88,10 +88,10 @@ func GetIncentiveLineChart(_ *gin.Context, input *GetIncentiveLineChartParams) (
 		}
 	}
 
-	// 构建时间范围条件
+	// Build time range conditions
 	args := make([]interface{}, 0)
 
-	// 构建CASE WHEN语句
+	// Build CASE WHEN statement
 	caseWhen := "CASE "
 	for i := 0; i < len(times)-1; i++ {
 		caseWhen += "WHEN time >= ? AND time < ? THEN ? "
@@ -101,7 +101,7 @@ func GetIncentiveLineChart(_ *gin.Context, input *GetIncentiveLineChartParams) (
 
 	caseWhenExpr := config.GetDB().Dialector.Explain(caseWhen, args...)
 
-	// 执行单个SQL查询
+	// Execute single SQL query
 	var results []IncentiveResult
 	query := config.GetDB().Model(&models.NodeIncentive{}).
 		Select([]string{"SUM(incentive) as incentive", caseWhenExpr}).
@@ -113,17 +113,17 @@ func GetIncentiveLineChart(_ *gin.Context, input *GetIncentiveLineChartParams) (
 		return nil, response.NewExceptionResponse(err)
 	}
 
-	// 处理结果
+	// Process results
 	timestamps := make([]int64, len(times)-1)
 	incentives := make([]float64, len(times)-1)
 
-	// 初始化所有时间段为0
+	// Initialize all time periods to 0
 	for i := 0; i < len(times)-1; i++ {
 		timestamps[i] = times[i].Unix()
 		incentives[i] = 0
 	}
 
-	// 填充有数据的时间段
+	// Fill in time periods with data
 	for _, result := range results {
 		if result.Index >= 0 && result.Index < len(incentives) && result.Incentive.Valid {
 			incentives[result.Index] = result.Incentive.Float64

@@ -2,12 +2,18 @@ package blockchain
 
 import (
 	"context"
+	"crynux_relay/blockchain/bindings"
 	"crynux_relay/config"
+	"database/sql"
 	"math/big"
 	"time"
 
+	"crynux_relay/models"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"gorm.io/gorm"
 )
 
 // GetCredits retrieves the credits balance for a given address
@@ -66,48 +72,8 @@ func GetOwner(ctx context.Context) (common.Address, error) {
 	return creditsContractInstance.Owner(opts)
 }
 
-// BuyCredits purchases credits for the caller (msg.sender)
-func BuyCredits(ctx context.Context, amount *big.Int) (string, error) {
-	creditsContractInstance := GetCreditsContractInstance()
-
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
-
-	txMutex.Lock()
-	defer txMutex.Unlock()
-
-	auth, err := GetAuth(ctx, address, privkey)
-	if err != nil {
-		return "", err
-	}
-
-	// Set the value to the amount being purchased (payable function)
-	auth.Value = amount
-
-	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
-		return "", err
-	}
-	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
-	auth.Nonce = big.NewInt(int64(nonce))
-
-	tx, err := creditsContractInstance.BuyCredits(auth, amount)
-	if err != nil {
-		return "", err
-	}
-
-	addNonce(nonce)
-	return tx.Hash().Hex(), nil
-}
-
 // BuyCreditsFor purchases credits for a specified address
-func BuyCreditsFor(ctx context.Context, addr common.Address, amount *big.Int) (string, error) {
+func CreateCredits(ctx context.Context, addr common.Address, amount *big.Int) (string, error) {
 	creditsContractInstance := GetCreditsContractInstance()
 
 	appConfig := config.GetConfig()
@@ -137,7 +103,7 @@ func BuyCreditsFor(ctx context.Context, addr common.Address, amount *big.Int) (s
 	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := creditsContractInstance.BuyCreditsFor(auth, addr, amount)
+	tx, err := creditsContractInstance.CreateCredits(auth, addr, amount)
 	if err != nil {
 		return "", err
 	}
@@ -147,7 +113,7 @@ func BuyCreditsFor(ctx context.Context, addr common.Address, amount *big.Int) (s
 }
 
 // SetStakingAddress sets the staking address (only callable by owner)
-func SetStakingAddress(ctx context.Context, stakingAddress common.Address) (string, error) {
+func SetStakingAddressForCredits(ctx context.Context, stakingAddress common.Address) (string, error) {
 	creditsContractInstance := GetCreditsContractInstance()
 
 	appConfig := config.GetConfig()
@@ -181,4 +147,144 @@ func SetStakingAddress(ctx context.Context, stakingAddress common.Address) (stri
 
 	addNonce(nonce)
 	return tx.Hash().Hex(), nil
+}
+
+// SetAdminAddress sets the admin address (only callable by owner)
+func SetAdminAddressForCredits(ctx context.Context, adminAddress common.Address) (string, error) {
+	creditsContractInstance := GetCreditsContractInstance()
+
+	appConfig := config.GetConfig()
+	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
+	privkey := appConfig.Blockchain.Account.PrivateKey
+
+	txMutex.Lock()
+	defer txMutex.Unlock()
+
+	auth, err := GetAuth(ctx, address, privkey)
+	if err != nil {
+		return "", err
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := getLimiter().Wait(callCtx); err != nil {
+		return "", err
+	}
+	auth.Context = callCtx
+	nonce, err := getNonce(callCtx, address)
+	if err != nil {
+		return "", err
+	}
+	auth.Nonce = big.NewInt(int64(nonce))
+
+	tx, err := creditsContractInstance.SetAdminAddress(auth, adminAddress)
+	if err != nil {
+		return "", err
+	}
+
+	addNonce(nonce)
+	return tx.Hash().Hex(), nil
+
+}
+
+// QueueCreateCredits queues a create credits transaction to be sent later
+func QueueCreateCredits(ctx context.Context, db *gorm.DB, addr common.Address, amount *big.Int) (*models.BlockchainTransaction, error) {
+	appConfig := config.GetConfig()
+	address := appConfig.Blockchain.Account.Address
+
+	abi, err := bindings.CreditsMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := abi.Pack("createCredits", addr, amount)
+	if err != nil {
+		return nil, err
+	}
+	dataStr := hexutil.Encode(data)
+
+	transaction := &models.BlockchainTransaction{
+		Type:        "Credits::createCredits",
+		Status:      models.TransactionStatusPending,
+		FromAddress: address,
+		Value:       amount.String(),
+		Data: sql.NullString{
+			String: dataStr,
+			Valid:  true,
+		},
+	}
+
+	if err := transaction.Save(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
+// QueueSetStakingAddressForCredits queues a set staking address transaction to be sent later
+func QueueSetStakingAddressForCredits(ctx context.Context, db *gorm.DB, stakingAddress common.Address) (*models.BlockchainTransaction, error) {
+	appConfig := config.GetConfig()
+	address := appConfig.Blockchain.Account.Address
+
+	abi, err := bindings.CreditsMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := abi.Pack("setStakingAddress", stakingAddress)
+	if err != nil {
+		return nil, err
+	}
+	dataStr := hexutil.Encode(data)
+
+	transaction := &models.BlockchainTransaction{
+		Type:        "Credits::setStakingAddress",
+		Status:      models.TransactionStatusPending,
+		FromAddress: address,
+		Value:       "0",
+		Data: sql.NullString{
+			String: dataStr,
+			Valid:  true,
+		},
+	}
+
+	if err := transaction.Save(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
+// QueueSetAdminAddressForCredits queues a set admin address transaction to be sent later
+func QueueSetAdminAddressForCredits(ctx context.Context, db *gorm.DB, adminAddress common.Address) (*models.BlockchainTransaction, error) {
+	appConfig := config.GetConfig()
+	address := appConfig.Blockchain.Account.Address
+
+	abi, err := bindings.CreditsMetaData.GetAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := abi.Pack("setAdminAddress", adminAddress)
+	if err != nil {
+		return nil, err
+	}
+	dataStr := hexutil.Encode(data)
+
+	transaction := &models.BlockchainTransaction{
+		Type:        "Credits::setAdminAddress",
+		Status:      models.TransactionStatusPending,
+		FromAddress: address,
+		Value:       "0",
+		Data: sql.NullString{
+			String: dataStr,
+			Valid:  true,
+		},
+	}
+
+	if err := transaction.Save(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
 }
