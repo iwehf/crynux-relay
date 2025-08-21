@@ -91,7 +91,12 @@ func (d *TaskDispatcher) getQueuedTasks(ctx context.Context) {
 							ctx1, cancel := context.WithTimeout(ctx, 10*time.Second)
 							defer cancel()
 							appConfig := config.GetConfig()
-							if err := SetTaskStatusEndAborted(ctx1, config.GetDB(), task, appConfig.Blockchain.Account.Address); err != nil {
+							var abortIssuer string
+							for _, blockchain := range appConfig.Blockchains {
+								abortIssuer = blockchain.Account.Address
+								break
+							}
+							if err := SetTaskStatusEndAborted(ctx1, config.GetDB(), task, abortIssuer); err != nil {
 								log.Errorf("StartTask: abort task %s error: %v", task.TaskIDCommitment, err)
 							}
 							return

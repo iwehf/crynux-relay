@@ -11,6 +11,7 @@ require (
 	github.com/gin-contrib/static v0.0.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-gormigrate/gormigrate/v2 v2.1.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/loopfz/gadgeto v0.9.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sirupsen/logrus v1.9.3

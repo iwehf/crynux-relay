@@ -182,7 +182,12 @@ func GetAllNodeIncentive(c *gin.Context, input *GetAllNodeIncentiveParamsWithSig
 	}
 
 	appConfig := config.GetConfig()
-	if address != appConfig.Blockchain.Account.Address {
+	var rootAddress string
+	for _, blockchain := range appConfig.Blockchains {
+		rootAddress = blockchain.Account.Address
+		break
+	}
+	if address != rootAddress {
 		validationErr := response.NewValidationErrorResponse("address", "Signer not allowed")
 		return nil, validationErr
 	}

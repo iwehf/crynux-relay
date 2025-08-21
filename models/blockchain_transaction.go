@@ -22,6 +22,7 @@ const (
 // BlockchainTransaction represents a blockchain transaction that needs to be sent
 type BlockchainTransaction struct {
 	gorm.Model
+	Network           string            `json:"network" gorm:"index;not null"`
 	Type              string            `json:"type" gorm:"index;not null"`
 	Status            TransactionStatus `json:"status" gorm:"index;not null;default:0"`
 	FromAddress       string            `json:"from_address" gorm:"index;not null"`

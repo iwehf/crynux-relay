@@ -159,8 +159,12 @@ func (tc *TransactionConfirmer) confirmTransaction(ctx context.Context, transact
 	txHash := common.HexToHash(transaction.TxHash.String)
 
 	// Get transaction receipt
-	client := GetRpcClient()
-	receipt, err := client.TransactionReceipt(ctx, txHash)
+	client, err := GetBlockchainClient(transaction.Network)
+	if err != nil {
+		log.Errorf("Error getting blockchain client: %v", err)
+		return err
+	}
+	receipt, err := client.RpcClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
 		// If transaction is not found, it might still be pending
 		if errors.Is(err, ethereum.NotFound) {
@@ -182,7 +186,7 @@ func (tc *TransactionConfirmer) confirmTransaction(ctx context.Context, transact
 		}
 	} else {
 		// Transaction failed
-		if err := tc.handleFailedTransaction(ctx, transaction, receipt); err != nil {
+		if err := tc.handleFailedTransaction(ctx, client, transaction, receipt); err != nil {
 			log.Errorf("Failed to handle failed transaction: %v", err)
 			return err
 		}
@@ -203,9 +207,9 @@ func (tc *TransactionConfirmer) handleSuccessfulTransaction(ctx context.Context,
 }
 
 // handleFailedTransaction handles a failed transaction
-func (tc *TransactionConfirmer) handleFailedTransaction(ctx context.Context, transaction *models.BlockchainTransaction, receipt *types.Receipt) error {
+func (tc *TransactionConfirmer) handleFailedTransaction(ctx context.Context, client *BlockchainClient, transaction *models.BlockchainTransaction, receipt *types.Receipt) error {
 	// Get error message from receipt
-	errorMsg, err := GetErrorMessageFromReceipt(ctx, receipt)
+	errorMsg, err := client.GetErrorMessageFromReceipt(ctx, receipt)
 	if err != nil {
 		errorMsg = "Transaction failed with status 0"
 	}

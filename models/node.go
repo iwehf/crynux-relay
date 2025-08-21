@@ -24,6 +24,7 @@ const (
 
 type Node struct {
 	gorm.Model
+	Network                 string         `json:"network" gorm:"index"`
 	Address                 string         `json:"address" gorm:"index"`
 	Status                  NodeStatus     `json:"status" gorm:"index"`
 	GPUName                 string         `json:"gpu_name" gorm:"index"`
@@ -37,7 +38,7 @@ type Node struct {
 	CurrentTaskIDCommitment sql.NullString `json:"current_task_id_commitment" gorm:"null;default:null"`
 	CurrentTask             InferenceTask  `json:"-" gorm:"foreignKey:TaskIDCommitment;references:CurrentTaskIDCommitment"`
 	Models                  []NodeModel    `json:"-" gorm:"foreignKey:NodeAddress;references:Address"`
-	Balance                 Balance        `json:"-" gorm:"foreignKey:Address;references:Address"`
+	TaskFee                 TaskFee        `json:"-" gorm:"foreignKey:Address;references:Address"`
 }
 
 func (node *Node) Save(ctx context.Context, db *gorm.DB) error {

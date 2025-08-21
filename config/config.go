@@ -37,10 +37,15 @@ func InitConfig(configPath string) error {
 	}
 
 	if appConfig.Environment == EnvTest {
-		appConfig.Blockchain.Account.PrivateKey = GetTestPrivateKey()
+		privKey := GetTestPrivateKey()
+		for _, blockchain := range appConfig.Blockchains {
+			blockchain.Account.PrivateKey = privKey
+		}
 	} else {
 		// Load hard-coded private key
-		appConfig.Blockchain.Account.PrivateKey = GetPrivateKey(appConfig.Blockchain.Account.PrivateKeyFile)
+		for _, blockchain := range appConfig.Blockchains {
+			blockchain.Account.PrivateKey = GetPrivateKey(blockchain.Account.PrivateKeyFile)
+		}
 	}
 	if err := checkBlockchainAccount(); err != nil {
 		return err
@@ -51,38 +56,40 @@ func InitConfig(configPath string) error {
 
 func checkBlockchainAccount() error {
 
-	if appConfig.Blockchain.Account.PrivateKey == "" {
-		return errors.New("blockchain account private key not set")
-	}
-
-	if appConfig.Blockchain.Account.Address == "" {
-		return errors.New("blockchain account address not set")
-	}
-
-	var pk string
-	if strings.HasPrefix(appConfig.Blockchain.Account.PrivateKey, "0x") {
-		pk = appConfig.Blockchain.Account.PrivateKey[2:]
-	} else {
-		pk = appConfig.Blockchain.Account.PrivateKey
-	}
-
-	// Check private key and address
-	privateKey, err := crypto.HexToECDSA(pk)
-	if err != nil {
-		return err
-	}
-
-	publicKey := privateKey.Public()
-
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return errors.New("error casting public key to ECDSA")
-	}
-
-	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
-
-	if address != appConfig.Blockchain.Account.Address {
-		return errors.New("account address and private key mismatch")
+	for _, blockchain := range appConfig.Blockchains {
+		if blockchain.Account.PrivateKey == "" {
+			return errors.New("blockchain account private key not set")
+		}
+	
+		if blockchain.Account.Address == "" {
+			return errors.New("blockchain account address not set")
+		}
+	
+		var pk string
+		if strings.HasPrefix(blockchain.Account.PrivateKey, "0x") {
+			pk = blockchain.Account.PrivateKey[2:]
+		} else {
+			pk = blockchain.Account.PrivateKey
+		}
+	
+		// Check private key and address
+		privateKey, err := crypto.HexToECDSA(pk)
+		if err != nil {
+			return err
+		}
+	
+		publicKey := privateKey.Public()
+	
+		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+		if !ok {
+			return errors.New("error casting public key to ECDSA")
+		}
+	
+		address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
+	
+		if address != blockchain.Account.Address {
+			return errors.New("account address and private key mismatch")
+		}
 	}
 
 	return nil

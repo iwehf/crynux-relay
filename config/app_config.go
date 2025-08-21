@@ -32,13 +32,18 @@ type AppConfig struct {
 	Http struct {
 		Host string `mapstructure:"host"`
 		Port string `mapstructure:"port"`
+
+		JWT struct {
+			SecretKey string `mapstructure:"secret_key"`
+			ExpiresIn uint64 `mapstructure:"expires_in"`
+		} `mapstructure:"jwt"`
 	} `mapstructure:"http"`
 
 	DataDir struct {
 		InferenceTasks string `mapstructure:"inference_tasks"`
 	} `mapstructure:"data_dir"`
 
-	Blockchain struct {
+	Blockchains map[string]struct {
 		RPS           uint64 `mapstructure:"rps"`
 		RpcEndpoint   string `mapstructure:"rpc_endpoint"`
 		StartBlockNum uint64 `mapstructure:"start_block_num"`
@@ -56,7 +61,7 @@ type AppConfig struct {
 			NodeStaking    string `mapstructure:"node_staking"`
 			Credits        string `mapstructure:"credits"`
 		} `mapstructure:"contracts"`
-	} `mapstructure:"blockchain"`
+	} `mapstructure:"blockchains"`
 
 	Task struct {
 		StakeAmount       uint64 `mapstructure:"stake_amount" description:"stake amount, in ether unit"`

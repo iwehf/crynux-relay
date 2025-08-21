@@ -3,7 +3,6 @@ package blockchain
 import (
 	"context"
 	"crynux_relay/blockchain/bindings"
-	"crynux_relay/config"
 	"database/sql"
 	"math/big"
 	"time"
@@ -16,8 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetBenefitAddress(ctx context.Context, nodeAddress common.Address) (common.Address, error) {
-	benefitAddressContractInstance := GetBenefitAddressContractInstance()
+func GetBenefitAddress(ctx context.Context, nodeAddress common.Address, network string) (common.Address, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return common.Address{}, err
+	}
+
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -26,49 +29,52 @@ func GetBenefitAddress(ctx context.Context, nodeAddress common.Address) (common.
 		Context: callCtx,
 	}
 
-	return benefitAddressContractInstance.GetBenefitAddress(opts, nodeAddress)
+	return client.BenefitAddressContractInstance.GetBenefitAddress(opts, nodeAddress)
 }
 
-func SetBenefitAddress(ctx context.Context, benefitAddress common.Address) (string, error) {
-	benefitAddressContractInstance := GetBenefitAddressContractInstance()
+func SetBenefitAddress(ctx context.Context, benefitAddress common.Address, network string) (string, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return "", err
+	}
 
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
 
-	txMutex.Lock()
-	defer txMutex.Unlock()
+	nonce, err := client.GetNonce(ctx)
+	if err != nil {
+		return "", err
+	}
 
-	auth, err := GetAuth(ctx, address, privkey)
+	auth, err := client.GetAuth(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
+	if err := client.Limiter.Wait(callCtx); err != nil {
 		return "", err
 	}
 	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := benefitAddressContractInstance.SetBenefitAddress(auth, benefitAddress)
+	tx, err := client.BenefitAddressContractInstance.SetBenefitAddress(auth, benefitAddress)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
 
-	addNonce(nonce)
+	client.IncrementNonce()
 	return tx.Hash().Hex(), nil
 }
 
 // QueueSetBenefitAddress queues a set benefit address transaction to be sent later
-func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress common.Address) (*models.BlockchainTransaction, error) {
-	appConfig := config.GetConfig()
-	address := appConfig.Blockchain.Account.Address
+func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress common.Address, network string) (*models.BlockchainTransaction, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return nil, err
+	}
 
 	abi, err := bindings.BenefitAddressMetaData.GetAbi()
 	if err != nil {
@@ -82,9 +88,10 @@ func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress com
 	dataStr := hexutil.Encode(data)
 
 	transaction := &models.BlockchainTransaction{
+		Network:     network,
 		Type:        "BenefitAddress::setBenefitAddress",
 		Status:      models.TransactionStatusPending,
-		FromAddress: address,
+		FromAddress: client.Address,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,

@@ -15,7 +15,7 @@ import (
 )
 
 func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, modelIDs []string) error {
-	stakingInfo, err := blockchain.GetStakingInfo(ctx, common.HexToAddress(node.Address))
+	stakingInfo, err := blockchain.GetStakingInfo(ctx, common.HexToAddress(node.Address), node.Network)
 	if err != nil {
 		return err
 	}
@@ -76,11 +76,11 @@ func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slas
 			return err
 		}
 		if slashed {
-			if _, err := blockchain.QueueSlashStaking(ctx, tx, common.HexToAddress(node.Address)); err != nil {
+			if _, err := blockchain.QueueSlashStaking(ctx, tx, common.HexToAddress(node.Address), node.Network); err != nil {
 				return err
 			}
 		} else {
-			if _, err := blockchain.QueueUnstake(ctx, tx, common.HexToAddress(node.Address)); err != nil {
+			if _, err := blockchain.QueueUnstake(ctx, tx, common.HexToAddress(node.Address), node.Network); err != nil {
 				return err
 			}
 		}

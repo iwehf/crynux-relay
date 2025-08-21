@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"context"
-	"crynux_relay/config"
 	"crynux_relay/models"
 	"math/big"
 	"sync"
@@ -11,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -25,7 +23,6 @@ type TransactionSender struct {
 	isRunning     bool
 	batchSize     int
 	pollInterval  time.Duration
-	client        *ethclient.Client
 }
 
 // NewTransactionSender creates a new transaction sender instance
@@ -37,7 +34,6 @@ func NewTransactionSender(db *gorm.DB) *TransactionSender {
 		isRunning:    false,
 		batchSize:    50,
 		pollInterval: 5 * time.Second,
-		client:       GetRpcClient(),
 	}
 }
 
@@ -160,23 +156,9 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 		return nil
 	}
 
-	// Get private key
-	appConfig := config.GetConfig()
-	privateKey := appConfig.Blockchain.Account.PrivateKey
-
-	// Get current gas price
-	gasPrice := getGasPrice()
-	gasLimit := appConfig.Blockchain.GasLimit
-
-	// Get nonce
-	fromAddress := common.HexToAddress(transaction.FromAddress)
-	nonce, err := getNonce(ctx, fromAddress)
-	if err != nil {
-		return err
-	}
 
 	// Send transaction based on type
-	txHash, err := ts.sendRawTransaction(ctx, transaction, privateKey, nonce, gasPrice, gasLimit)
+	txHash, err := ts.sendRawTransaction(ctx, transaction)
 	if err != nil {
 		return err
 	}
@@ -186,23 +168,33 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 		return err
 	}
 
-	// Increment nonce
-	addNonce(nonce)
-
 	log.Infof("Transaction %d sent successfully with hash: %s", transaction.ID, txHash)
 	return nil
 }
 
 // sendRawTransaction sends a raw transaction to the blockchain
-func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction *models.BlockchainTransaction, privateKey string, nonce uint64, gasPrice *big.Int, gasLimit uint64) (string, error) {
-	auth, err := GetAuth(ctx, common.HexToAddress(transaction.FromAddress), privateKey)
+func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction *models.BlockchainTransaction) (string, error) {
+	client, err := GetBlockchainClient(transaction.Network)
+	if err != nil {
+		return "", err
+	}
+
+	auth, err := client.GetAuth(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
+
+	nonce, err := client.GetNonce(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.GasPrice = gasPrice
-	auth.GasLimit = gasLimit
+	auth.GasPrice = client.GasPrice
+	auth.GasLimit = client.GasLimit
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -221,8 +213,8 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 	baseTx := &types.LegacyTx{
 		To:       &toAddress,
 		Nonce:    nonce,
-		GasPrice: gasPrice,
-		Gas:      gasLimit,
+		GasPrice: client.GasPrice,
+		Gas:      client.GasLimit,
 		Value:    value,
 		Data:     data,
 	}
@@ -234,10 +226,13 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 		return "", err
 	}
 
-	err = ts.client.SendTransaction(callCtx, signedTx)
+	err = client.RpcClient.SendTransaction(callCtx, signedTx)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
+
+	client.IncrementNonce()
 
 	return signedTx.Hash().Hex(), nil
 }

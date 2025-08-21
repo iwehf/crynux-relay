@@ -6,6 +6,7 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/models"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -16,8 +17,12 @@ import (
 )
 
 // GetMinStakeAmount gets the minimum stake amount
-func GetMinStakeAmount(ctx context.Context) (*big.Int, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func GetMinStakeAmount(ctx context.Context, network string) (*big.Int, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return nil, err
+	}
+
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -26,12 +31,16 @@ func GetMinStakeAmount(ctx context.Context) (*big.Int, error) {
 		Context: callCtx,
 	}
 
-	return nodeStakingContractInstance.GetMinStakeAmount(opts)
+	return client.NodeStakingContractInstance.GetMinStakeAmount(opts)
 }
 
 // GetStakingInfo gets the staking information for a specific node
-func GetStakingInfo(ctx context.Context, nodeAddress common.Address) (bindings.NodeStakingStakingInfo, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func GetStakingInfo(ctx context.Context, nodeAddress common.Address, network string) (bindings.NodeStakingStakingInfo, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return bindings.NodeStakingStakingInfo{}, err
+	}
+
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -40,12 +49,16 @@ func GetStakingInfo(ctx context.Context, nodeAddress common.Address) (bindings.N
 		Context: callCtx,
 	}
 
-	return nodeStakingContractInstance.GetStakingInfo(opts, nodeAddress)
+	return client.NodeStakingContractInstance.GetStakingInfo(opts, nodeAddress)
 }
 
 // GetAllNodeAddresses gets all staked node addresses
-func GetAllNodeAddresses(ctx context.Context) ([]common.Address, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func GetAllNodeAddresses(ctx context.Context, network string) ([]common.Address, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return nil, err
+	}
+
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -54,12 +67,16 @@ func GetAllNodeAddresses(ctx context.Context) ([]common.Address, error) {
 		Context: callCtx,
 	}
 
-	return nodeStakingContractInstance.GetAllNodeAddresses(opts)
+	return client.NodeStakingContractInstance.GetAllNodeAddresses(opts)
 }
 
 // GetNodeStakingOwner gets the contract owner address
-func GetNodeStakingOwner(ctx context.Context) (common.Address, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func GetNodeStakingOwner(ctx context.Context, network string) (common.Address, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return common.Address{}, err
+	}
+
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -68,21 +85,25 @@ func GetNodeStakingOwner(ctx context.Context) (common.Address, error) {
 		Context: callCtx,
 	}
 
-	return nodeStakingContractInstance.Owner(opts)
+	return client.NodeStakingContractInstance.Owner(opts)
 }
 
 // Stake stakes tokens
-func Stake(ctx context.Context, stakedAmount *big.Int) (string, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func Stake(ctx context.Context, stakedAmount *big.Int, network string) (string, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return "", err
+	}
 
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
 
-	txMutex.Lock()
-	defer txMutex.Unlock()
-
-	auth, err := GetAuth(ctx, address, privkey)
+	nonce, err := client.GetNonce(ctx)
+	if err != nil {
+		return "", err
+	}
+	
+	auth, err := client.GetAuth(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -92,29 +113,29 @@ func Stake(ctx context.Context, stakedAmount *big.Int) (string, error) {
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
+	if err := client.Limiter.Wait(callCtx); err != nil {
 		return "", err
 	}
 	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := nodeStakingContractInstance.Stake(auth, stakedAmount)
+	tx, err := client.NodeStakingContractInstance.Stake(auth, stakedAmount)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
 
-	addNonce(nonce)
+	client.IncrementNonce()
 	return tx.Hash().Hex(), nil
 }
 
 // QueueStake queues a stake transaction to be sent later
-func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int) (*models.BlockchainTransaction, error) {
+func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int, network string) (*models.BlockchainTransaction, error) {
 	appConfig := config.GetConfig()
-	address := appConfig.Blockchain.Account.Address
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
+	}
 
 	abi, err := bindings.NodeStakingMetaData.GetAbi()
 	if err != nil {
@@ -128,9 +149,10 @@ func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int) (*model
 	dataStr := hexutil.Encode(data)
 
 	transaction := &models.BlockchainTransaction{
+		Network:     network,
 		Type:        "NodeStaking::stake",
 		Status:      models.TransactionStatusPending,
-		FromAddress: address,
+		FromAddress: blockchain.Account.Address,
 		Value:       stakedAmount.String(),
 		Data: sql.NullString{
 			String: dataStr,
@@ -146,46 +168,50 @@ func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int) (*model
 }
 
 // Unstake removes the stake
-func Unstake(ctx context.Context, nodeAddress common.Address) (string, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func Unstake(ctx context.Context, nodeAddress common.Address, network string) (string, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return "", err
+	}
 
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
 
-	txMutex.Lock()
-	defer txMutex.Unlock()
-
-	auth, err := GetAuth(ctx, address, privkey)
+	nonce, err := client.GetNonce(ctx)
+	if err != nil {
+		return "", err
+	}
+	
+	auth, err := client.GetAuth(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
+	if err := client.Limiter.Wait(callCtx); err != nil {
 		return "", err
 	}
 	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := nodeStakingContractInstance.Unstake(auth, nodeAddress)
+	tx, err := client.NodeStakingContractInstance.Unstake(auth, nodeAddress)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
 
-	addNonce(nonce)
+	client.IncrementNonce()
 	return tx.Hash().Hex(), nil
 }
 
 // QueueUnstake queues an unstake transaction to be sent later
-func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address) (*models.BlockchainTransaction, error) {
+func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address, network string) (*models.BlockchainTransaction, error) {
 	appConfig := config.GetConfig()
-	address := appConfig.Blockchain.Account.Address
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
+	}
 
 	abi, err := bindings.NodeStakingMetaData.GetAbi()
 	if err != nil {
@@ -199,9 +225,10 @@ func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address) 
 	dataStr := hexutil.Encode(data)
 
 	transaction := &models.BlockchainTransaction{
+		Network:     network,
 		Type:        "NodeStaking::unstake",
 		Status:      models.TransactionStatusPending,
-		FromAddress: address,
+		FromAddress: blockchain.Account.Address,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,
@@ -217,46 +244,50 @@ func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address) 
 }
 
 // SetAdminAddress sets the admin address (owner only)
-func SetAdminAddressForNodeStaking(ctx context.Context, adminAddress common.Address) (string, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func SetAdminAddressForNodeStaking(ctx context.Context, adminAddress common.Address, network string) (string, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return "", err
+	}
 
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
 
-	txMutex.Lock()
-	defer txMutex.Unlock()
+	nonce, err := client.GetNonce(ctx)
+	if err != nil {
+		return "", err
+	}
 
-	auth, err := GetAuth(ctx, address, privkey)
+	auth, err := client.GetAuth(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
+	if err := client.Limiter.Wait(callCtx); err != nil {
 		return "", err
 	}
 	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := nodeStakingContractInstance.SetAdminAddress(auth, adminAddress)
+	tx, err := client.NodeStakingContractInstance.SetAdminAddress(auth, adminAddress)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
 
-	addNonce(nonce)
+	client.IncrementNonce()
 	return tx.Hash().Hex(), nil
 }
 
 // QueueSetAdminAddressForNodeStaking queues a set admin address transaction to be sent later
-func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminAddress common.Address) (*models.BlockchainTransaction, error) {
+func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminAddress common.Address, network string) (*models.BlockchainTransaction, error) {
 	appConfig := config.GetConfig()
-	address := appConfig.Blockchain.Account.Address
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
+	}
 
 	abi, err := bindings.NodeStakingMetaData.GetAbi()
 	if err != nil {
@@ -270,9 +301,10 @@ func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminA
 	dataStr := hexutil.Encode(data)
 
 	transaction := &models.BlockchainTransaction{
+		Network:     network,
 		Type:        "NodeStaking::setAdminAddress",
 		Status:      models.TransactionStatusPending,
-		FromAddress: address,
+		FromAddress: blockchain.Account.Address,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,
@@ -288,46 +320,49 @@ func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminA
 }
 
 // SlashStaking slashes the node's stake (owner or admin only)
-func SlashStaking(ctx context.Context, nodeAddress common.Address) (string, error) {
-	nodeStakingContractInstance := GetNodeStakingContractInstance()
+func SlashStaking(ctx context.Context, nodeAddress common.Address, network string) (string, error) {
+	client, err := GetBlockchainClient(network)
+	if err != nil {
+		return "", err
+	}
+	
+	client.NonceMu.Lock()
+	defer client.NonceMu.Unlock()
+	nonce, err := client.GetNonce(ctx)
+	if err != nil {
+		return "", err
+	}
 
-	appConfig := config.GetConfig()
-	address := common.HexToAddress(appConfig.Blockchain.Account.Address)
-	privkey := appConfig.Blockchain.Account.PrivateKey
-
-	txMutex.Lock()
-	defer txMutex.Unlock()
-
-	auth, err := GetAuth(ctx, address, privkey)
+	auth, err := client.GetAuth(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	if err := getLimiter().Wait(callCtx); err != nil {
+	if err := client.Limiter.Wait(callCtx); err != nil {
 		return "", err
 	}
 	auth.Context = callCtx
-	nonce, err := getNonce(callCtx, address)
-	if err != nil {
-		return "", err
-	}
 	auth.Nonce = big.NewInt(int64(nonce))
 
-	tx, err := nodeStakingContractInstance.SlashStaking(auth, nodeAddress)
+	tx, err := client.NodeStakingContractInstance.SlashStaking(auth, nodeAddress)
 	if err != nil {
+		err = client.processSendingTxError(err)
 		return "", err
 	}
 
-	addNonce(nonce)
+	client.IncrementNonce()
 	return tx.Hash().Hex(), nil
 }
 
 // QueueSlashStaking queues a slash staking transaction to be sent later
-func QueueSlashStaking(ctx context.Context, db *gorm.DB, nodeAddress common.Address) (*models.BlockchainTransaction, error) {
+func QueueSlashStaking(ctx context.Context, db *gorm.DB, nodeAddress common.Address, network string) (*models.BlockchainTransaction, error) {
 	appConfig := config.GetConfig()
-	address := appConfig.Blockchain.Account.Address
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
+	}
 
 	abi, err := bindings.NodeStakingMetaData.GetAbi()
 	if err != nil {
@@ -341,9 +376,10 @@ func QueueSlashStaking(ctx context.Context, db *gorm.DB, nodeAddress common.Addr
 	dataStr := hexutil.Encode(data)
 
 	transaction := &models.BlockchainTransaction{
+		Network:     network,
 		Type:        "NodeStaking::slashStaking",
 		Status:      models.TransactionStatusPending,
-		FromAddress: address,
+		FromAddress: blockchain.Account.Address,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,

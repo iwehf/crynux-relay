@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crynux_relay/config"
 	"crynux_relay/models"
 	"crynux_relay/utils"
 	"database/sql"
@@ -20,13 +19,11 @@ var (
 )
 
 func CreateTask(ctx context.Context, db *gorm.DB, task *models.InferenceTask) error {
-	appConfig := config.GetConfig()
-
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := task.Create(ctx, tx); err != nil {
 			return err
 		}
-		commitFunc, err := Transfer(ctx, tx, task.Creator, appConfig.Blockchain.Account.Address, &task.TaskFee.Int)
+		commitFunc, err := SpendTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -287,9 +284,8 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		return err
 	}
 
-	appConfig := config.GetConfig()
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := Transfer(ctx, tx, appConfig.Blockchain.Account.Address, task.Creator, &task.TaskFee.Int)
+		commitFunc, err := RefundTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -339,9 +335,8 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 		"validated_time": task.ValidatedTime,
 		"qos_score":      task.QOSScore,
 	}
-	appConfig := config.GetConfig()
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := Transfer(ctx, tx, appConfig.Blockchain.Account.Address, task.Creator, &task.TaskFee.Int)
+		commitFunc, err := RefundTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -398,7 +393,12 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 		return err
 	}
 	status := models.TaskEndSuccess
-	payments := map[string]*big.Int{}
+	type taskPayment struct {
+		taskIDCommitment string
+		address          string
+		payment          *big.Int
+	}
+	payments := make([]taskPayment, 0)
 	if len(tasks) > 1 {
 		status = models.TaskEndGroupSuccess
 		// calculate each task's payment
@@ -419,27 +419,34 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			if i == len(validTasks)-1 {
 				payment.Add(payment, totalRem)
 			}
-			payments[t.SelectedNode] = payment
+			payments = append(payments, taskPayment{
+				taskIDCommitment: t.TaskIDCommitment,
+				address:          t.SelectedNode,
+				payment:          payment,
+			})
 		}
 
-	} else {
-		payments[task.SelectedNode] = &task.TaskFee.Int
+	} else {	
+		payments = append(payments, taskPayment{
+			taskIDCommitment: task.TaskIDCommitment,
+			address:          task.SelectedNode,
+			payment:          &task.TaskFee.Int,
+		})
 	}
 
-	appConfig := config.GetConfig()
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var commitFuncs []func()
-		for address, payment := range payments {
-			commitFunc, err := Transfer(ctx, tx, appConfig.Blockchain.Account.Address, address, payment)
+		for _, payment := range payments {
+			commitFunc, err := SendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment)
 			if err != nil {
 				return err
 			}
 			commitFuncs = append(commitFuncs, commitFunc)
 		}
 
-		for address, payment := range payments {
-			incentive, _ := utils.WeiToEther(payment).Float64()
-			if err := addNodeIncentive(ctx, tx, address, incentive, task.TaskType); err != nil {
+		for _, payment := range payments {
+			incentive, _ := utils.WeiToEther(payment.payment).Float64()
+			if err := addNodeIncentive(ctx, tx, payment.address, incentive, task.TaskType); err != nil {
 				return err
 			}
 		}

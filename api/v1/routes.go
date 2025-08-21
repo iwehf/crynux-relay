@@ -1,16 +1,19 @@
 package v1
 
 import (
-	"crynux_relay/api/v1/balance"
+	"crynux_relay/api/v1/client"
 	"crynux_relay/api/v1/event"
 	"crynux_relay/api/v1/incentive"
 	"crynux_relay/api/v1/inference_tasks"
+	"crynux_relay/api/v1/middleware"
 	"crynux_relay/api/v1/network"
 	"crynux_relay/api/v1/nodes"
 	"crynux_relay/api/v1/response"
 	"crynux_relay/api/v1/staking"
 	"crynux_relay/api/v1/stats"
+	taskfee "crynux_relay/api/v1/task_fee"
 	"crynux_relay/api/v1/time"
+	"crynux_relay/api/v1/withdraw"
 	"crynux_relay/api/v1/worker"
 
 	"github.com/loopfz/gadgeto/tonic"
@@ -114,11 +117,7 @@ func InitRoutes(r *fizz.Fizz) {
 	balanceGroup.GET("/:address", []fizz.OperationOption{
 		fizz.Summary("Get balance of account"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(balance.GetBalance, 200))
-	balanceGroup.POST("/:from/transfer", []fizz.OperationOption{
-		fizz.Summary("Transfer balance of account"),
-		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(balance.Transfer, 200))
+	}, tonic.Handler(taskfee.GetTaskFee, 200))
 
 	stakingGroup := v1g.Group("staking", "staking", "staking related APIs")
 	stakingGroup.GET("/:address", []fizz.OperationOption{
@@ -230,4 +229,37 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(incentive.GetNodeIncentive, 200))
 
+	taskFeeGroup := v1g.Group("task_fee", "task_fee", "task fee related APIs")
+	taskFeeGroup.GET("/logs", []fizz.OperationOption{
+		fizz.Summary("Get task fee logs"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(taskfee.GetTaskFeeLogs, 200))
+
+	withdrawGroup := v1g.Group("withdraw", "withdraw", "withdraw related APIs")
+	withdrawGroup.GET("/list", []fizz.OperationOption{
+		fizz.Summary("Get withdraw requests"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(withdraw.GetWithdrawRequests, 200))
+	withdrawGroup.POST("/:id/fufill", []fizz.OperationOption{
+		fizz.Summary("Fufill withdraw request"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(withdraw.FufillWithdrawRequest, 200))
+	withdrawGroup.POST("/:id/reject", []fizz.OperationOption{
+		fizz.Summary("Reject withdraw request"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(withdraw.RejectWithdrawRequest, 200))
+
+	clientGroup := v1g.Group("client", "client", "client related APIs")
+	clientGroup.POST("/connect_wallet", []fizz.OperationOption{
+		fizz.Summary("Connect wallet"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(client.ConnectWallet, 200))
+	clientGroup.POST("/withdraw", []fizz.OperationOption{
+		fizz.Summary("Create withdraw request"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.CreateWithdrawRequest, 200))
+	clientGroup.GET("/withdraw/list", []fizz.OperationOption{
+		fizz.Summary("Get withdraw records"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetWithdrawRecords, 200))
 }
