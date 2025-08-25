@@ -153,6 +153,7 @@ func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int, network
 		Type:        "NodeStaking::stake",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.NodeStaking,
 		Value:       stakedAmount.String(),
 		Data: sql.NullString{
 			String: dataStr,
@@ -229,6 +230,7 @@ func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address, 
 		Type:        "NodeStaking::unstake",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.NodeStaking,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,
@@ -305,6 +307,7 @@ func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminA
 		Type:        "NodeStaking::setAdminAddress",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.NodeStaking,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,
@@ -380,6 +383,7 @@ func QueueSlashStaking(ctx context.Context, db *gorm.DB, nodeAddress common.Addr
 		Type:        "NodeStaking::slashStaking",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.NodeStaking,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,

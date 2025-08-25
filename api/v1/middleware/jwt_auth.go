@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/v1/tools"
+	"crynux_relay/api/tools"
 	"net/http"
 	"strings"
 

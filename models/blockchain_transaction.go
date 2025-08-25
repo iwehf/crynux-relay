@@ -25,8 +25,8 @@ type BlockchainTransaction struct {
 	Network           string            `json:"network" gorm:"index;not null"`
 	Type              string            `json:"type" gorm:"index;not null"`
 	Status            TransactionStatus `json:"status" gorm:"index;not null;default:0"`
-	FromAddress       string            `json:"from_address" gorm:"index;not null"`
-	ToAddress         sql.NullString    `json:"to_address" gorm:"null"`
+	FromAddress       string            `json:"from_address" gorm:"not null"`
+	ToAddress         string            `json:"to_address" gorm:"not null"`
 	Value             string            `json:"value" gorm:"not null;default:'0'"`
 	Data              sql.NullString    `json:"data" gorm:"null"`
 	TxHash            sql.NullString    `json:"tx_hash" gorm:"null;uniqueIndex"`
@@ -120,7 +120,7 @@ func makeTxStatusUpdates(status TransactionStatus, txHash string, statusMessage 
 	updates := map[string]interface{}{
 		"status": status,
 	}
-	
+
 	if txHash != "" {
 		updates["tx_hash"] = txHash
 		updates["sent_at"] = time.Now()

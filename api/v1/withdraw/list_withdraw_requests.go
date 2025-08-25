@@ -1,29 +1,37 @@
 package withdraw
 
 import (
+	"context"
 	"crynux_relay/api/v1/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 type GetWithdrawRequestsInput struct {
-	StartID uint `query:"start_id" json:"start_id" description:"Start ID"`
-	Limit   int  `query:"limit" json:"limit" description:"Limit"`
+	StartID uint                   `query:"start_id" json:"start_id" description:"Start ID"`
+	Limit   int                    `query:"limit" json:"limit" description:"Limit"`
 	Status  *models.WithdrawStatus `query:"status" json:"status" description:"Status"`
+}
+
+type WithdrawRecord struct {
+	ID             uint   `json:"id"`
+	Address        string `json:"address"`
+	BenefitAddress string `json:"benefit_address"`
+	Amount         string `json:"amount"`
+	Network        string `json:"network"`
 }
 
 type GetWithdrawRequestsResponse struct {
 	response.Response
-	Data []models.WithdrawRecord `json:"data"`
+	Data []WithdrawRecord `json:"data"`
 }
 
 func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInput) (*GetWithdrawRequestsResponse, error) {
 	var records []models.WithdrawRecord
-	
+
 	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
@@ -36,7 +44,18 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInput) (*GetWith
 		return nil, err
 	}
 
+	results := make([]WithdrawRecord, 0, len(records))
+	for _, record := range records {
+		results = append(results, WithdrawRecord{
+			ID:             record.ID,
+			Address:        record.Address,
+			BenefitAddress: record.BenefitAddress,
+			Amount:         record.Amount.String(),
+			Network:        record.Network,
+		})
+	}
+
 	return &GetWithdrawRequestsResponse{
-		Data: records,
+		Data: results,
 	}, nil
 }

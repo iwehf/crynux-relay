@@ -4,7 +4,7 @@ import (
 	"context"
 	"crynux_relay/api/v1/middleware"
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/v1/tools"
+	"crynux_relay/api/tools"
 	"crynux_relay/blockchain"
 	"crynux_relay/config"
 	"crynux_relay/models"

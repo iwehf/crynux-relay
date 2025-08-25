@@ -3,7 +3,9 @@ package blockchain
 import (
 	"context"
 	"crynux_relay/blockchain/bindings"
+	"crynux_relay/config"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -71,9 +73,10 @@ func SetBenefitAddress(ctx context.Context, benefitAddress common.Address, netwo
 
 // QueueSetBenefitAddress queues a set benefit address transaction to be sent later
 func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress common.Address, network string) (*models.BlockchainTransaction, error) {
-	client, err := GetBlockchainClient(network)
-	if err != nil {
-		return nil, err
+	appConfig := config.GetConfig()
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
 	}
 
 	abi, err := bindings.BenefitAddressMetaData.GetAbi()
@@ -91,7 +94,8 @@ func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress com
 		Network:     network,
 		Type:        "BenefitAddress::setBenefitAddress",
 		Status:      models.TransactionStatusPending,
-		FromAddress: client.Address,
+		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.BenefitAddress,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,

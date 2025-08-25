@@ -201,7 +201,7 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 	auth.Context = callCtx
 
 	value, _ := new(big.Int).SetString(transaction.Value, 10)
-	toAddress := common.HexToAddress(transaction.ToAddress.String)
+	toAddress := common.HexToAddress(transaction.ToAddress)
 	var data []byte
 	if transaction.Data.Valid {
 		data, err = hexutil.Decode(transaction.Data.String)

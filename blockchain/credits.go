@@ -192,9 +192,10 @@ func SetAdminAddressForCredits(ctx context.Context, adminAddress common.Address,
 
 // QueueCreateCredits queues a create credits transaction to be sent later
 func QueueCreateCredits(ctx context.Context, db *gorm.DB, addr common.Address, amount *big.Int, network string) (*models.BlockchainTransaction, error) {
-	client, err := GetBlockchainClient(network)
-	if err != nil {
-		return nil, err
+	appConfig := config.GetConfig()
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, fmt.Errorf("network %s not found", network)
 	}
 
 	abi, err := bindings.CreditsMetaData.GetAbi()
@@ -212,7 +213,8 @@ func QueueCreateCredits(ctx context.Context, db *gorm.DB, addr common.Address, a
 		Network:     network,
 		Type:        "Credits::createCredits",
 		Status:      models.TransactionStatusPending,
-		FromAddress: client.Address,
+		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.Credits,
 		Value:       amount.String(),
 		Data: sql.NullString{
 			String: dataStr,
@@ -251,6 +253,7 @@ func QueueSetStakingAddressForCredits(ctx context.Context, db *gorm.DB, stakingA
 		Type:        "Credits::setStakingAddress",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.Credits,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,
@@ -289,6 +292,7 @@ func QueueSetAdminAddressForCredits(ctx context.Context, db *gorm.DB, adminAddre
 		Type:        "Credits::setAdminAddress",
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
+		ToAddress:   blockchain.Contracts.Credits,
 		Value:       "0",
 		Data: sql.NullString{
 			String: dataStr,

@@ -18,7 +18,6 @@ import (
 )
 
 type NodeJoinInput struct {
-	Network  string        `json:"network" path:"network" description:"network" validate:"required"`
 	Address  string        `json:"address" path:"address" description:"address" validate:"required"`
 	GPUName  string        `json:"gpu_name" description:"gpu_name" validate:"required"`
 	GPUVram  uint64        `json:"gpu_vram" description:"gpu_vram" validate:"required"`
@@ -66,7 +65,6 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 	node, err := models.GetNodeByAddress(c.Request.Context(), config.GetDB(), in.Address)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		node = &models.Node{
-			Network:      in.Network,
 			Address:      in.Address,
 			GPUName:      in.GPUName,
 			GPUVram:      in.GPUVram,

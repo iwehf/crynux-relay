@@ -15,9 +15,16 @@ type GetTaskFeeLogsInput struct {
 	Limit   int  `query:"limit" json:"limit" description:"Limit"`
 }
 
+type TaskFeeLog struct {
+	ID               uint               `json:"id"`
+	CreatedAt        time.Time          `json:"created_at"`
+	Address          string             `json:"address"`
+	TaskFee          string             `json:"task_fee"`
+}
+
 type GetTaskFeeLogsResponse struct {
 	response.Response
-	Data []models.TaskFeeEvent `json:"data"`
+	Data []TaskFeeLog `json:"data"`
 }
 
 func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInput) (*GetTaskFeeLogsResponse, error) {
@@ -44,8 +51,17 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInput) (*GetTaskFeeLogsRes
 		}
 		events = events[:end]
 	}
-	
+
+	logs := make([]TaskFeeLog, 0, len(events))
+	for _, event := range events {
+		logs = append(logs, TaskFeeLog{
+			ID: event.ID,
+			CreatedAt: event.CreatedAt,
+			Address: event.Address,
+			TaskFee: event.TaskFee.String(),
+		})
+	}
 	return &GetTaskFeeLogsResponse{
-		Data: events,
+		Data: logs,
 	}, nil
 }

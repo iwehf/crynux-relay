@@ -2,7 +2,7 @@ package client
 
 import (
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/v1/tools"
+	"crynux_relay/api/tools"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"

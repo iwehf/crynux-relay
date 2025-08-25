@@ -5,7 +5,6 @@ import (
 	"context"
 	"crynux_relay/blockchain/bindings"
 	"crynux_relay/config"
-	"database/sql"
 	"errors"
 	"math/big"
 	"regexp"
@@ -24,8 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"golang.org/x/time/rate"
+	"gorm.io/gorm"
 )
 
 type BlockchainClient struct {
@@ -46,7 +45,6 @@ type BlockchainClient struct {
 
 var blockchainClients = make(map[string]*BlockchainClient)
 var pattern *regexp.Regexp = regexp.MustCompile(`[Nn]once`)
-
 
 func GetBlockchainClient(network string) (*BlockchainClient, error) {
 	client, exists := blockchainClients[network]
@@ -291,11 +289,8 @@ func QueueSendETH(ctx context.Context, db *gorm.DB, from common.Address, to comm
 		Type:        "SendETH",
 		Status:      models.TransactionStatusPending,
 		FromAddress: from.Hex(),
-		ToAddress: sql.NullString{
-			String: to.Hex(),
-			Valid:  true,
-		},
-		Value: amount.String(),
+		ToAddress:   to.Hex(),
+		Value:       amount.String(),
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {

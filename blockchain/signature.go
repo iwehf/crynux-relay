@@ -39,7 +39,7 @@ func (v *SignatureVerifier) VerifySignature(message, signature, expectedAddress 
 // GenerateSignMessage generates a standard message for signing
 // This follows the EIP-191 standard for signed data
 func (v *SignatureVerifier) GenerateSignMessage(action, address string, timestamp int64) string {
-	return fmt.Sprintf("Crynux API Key Management\nAction: %s\nAddress: %s\nTimestamp: %d",
+	return fmt.Sprintf("Crynux Relay\nAction: %s\nAddress: %s\nTimestamp: %d",
 		action, address, timestamp)
 }
 

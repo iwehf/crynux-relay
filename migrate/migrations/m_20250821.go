@@ -17,17 +17,17 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 	}
 	type BlockchainTransaction struct {
 		gorm.Model
-		Network           string         `json:"network" gorm:"index;not null"`
-		Type              string         `json:"type" gorm:"index;not null"`
+		Network           string         `json:"network" gorm:"type:string;size:191;index;not null"`
+		Type              string         `json:"type" gorm:"type:string;size:191;index;not null"`
 		Status            uint8          `json:"status" gorm:"index;not null;default:0"`
-		FromAddress       string         `json:"from_address" gorm:"index;not null"`
-		ToAddress         sql.NullString `json:"to_address" gorm:"null"`
+		FromAddress       string         `json:"from_address" gorm:"type:string;size:191;not null"`
+		ToAddress         string         `json:"to_address" gorm:"type:string;size:191;null"`
 		Value             string         `json:"value" gorm:"not null;default:'0'"`
 		Data              sql.NullString `json:"data" gorm:"null"`
-		TxHash            sql.NullString `json:"tx_hash" gorm:"null;uniqueIndex"`
+		TxHash            sql.NullString `json:"tx_hash" gorm:"type:string;size:191;null;uniqueIndex"`
 		BlockNumber       sql.NullInt64  `json:"block_number" gorm:"null"`
 		GasUsed           sql.NullInt64  `json:"gas_used" gorm:"null"`
-		EffectiveGasPrice sql.NullString `json:"effective_gas_price" gorm:"null"`
+		EffectiveGasPrice sql.NullString `json:"effective_gas_price" gorm:"type:string;size:191;null"`
 		StatusMessage     sql.NullString `json:"status_message" gorm:"null"`
 		RetryCount        uint8          `json:"retry_count" gorm:"not null;default:0"`
 		MaxRetries        uint8          `json:"max_retries" gorm:"not null;default:0"`
@@ -44,41 +44,41 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 
 	type TaskFee struct {
 		gorm.Model
-		Address string `json:"address" gorm:"uniqueIndex"`
-		TaskFee string `json:"task_fee" gorm:"type:string;size:255"`
+		Address string `json:"address" gorm:"type:string;size:191;uniqueIndex"`
+		TaskFee string `json:"task_fee" gorm:"type:string;size:191;not null"`
 	}
 
 	type TaskFeeEvent struct {
 		ID               uint      `json:"id" gorm:"primarykey"`
 		CreatedAt        time.Time `json:"created_at" gorm:"not null"`
-		TaskIDCommitment string    `json:"task_id_commitment" gorm:"not null;uniqueIndex"`
-		Address          string    `json:"address" gorm:"not null;index"`
-		TaskFee          string    `json:"task_fee" gorm:"not null"`
+		TaskIDCommitment string    `json:"task_id_commitment" gorm:"type:string;size:191;not null;uniqueIndex"`
+		Address          string    `json:"address" gorm:"type:string;size:191;not null;index"`
+		TaskFee          string    `json:"task_fee" gorm:"type:string;size:191;not null"`
 		Status           int       `json:"status" gorm:"not null;default:0;index"`
 	}
 
 	type TaskQuota struct {
 		gorm.Model
-		Address string `json:"address" gorm:"uniqueIndex"`
-		Quota   string `json:"quota" gorm:"type:string;size:255"`
+		Address string `json:"address" gorm:"type:string;size:191;uniqueIndex"`
+		Quota   string `json:"quota" gorm:"type:string;size:191;not null"`
 	}
 
 	type TaskQuotaEvent struct {
 		ID            uint      `json:"id" gorm:"primarykey"`
 		CreatedAt     time.Time `json:"created_at" gorm:"not null"`
-		Address       string    `json:"address" gorm:"not null;index"`
-		Quota         string    `json:"quota" gorm:"not null"`
+		Address       string    `json:"address" gorm:"type:string;size:191;not null;index"`
+		Quota         string    `json:"quota" gorm:"type:string;size:191;not null"`
 		Status        int       `json:"status" gorm:"not null;default:0;index"`
-		TaskQuotaType int       `json:"task_quota_type" gorm:"not null;index"`
-		Reason        string    `json:"reason" gorm:"not null;uniqueIndex"`
+		TaskQuotaType int       `json:"task_quota_type" gorm:"type:int;not null;index"`
+		Reason        string    `json:"reason" gorm:"type:string;size:191;not null;uniqueIndex"`
 	}
 
 	type WithdrawRecord struct {
 		gorm.Model
-		Address        string `json:"address" gorm:"not null;index"`
-		BenefitAddress string `json:"benefit_address" gorm:"not null;index"`
-		Amount         string `json:"amount" gorm:"not null"`
-		Network        string `json:"network" gorm:"not null;index"`
+		Address        string `json:"address" gorm:"type:string;size:191;not null;index"`
+		BenefitAddress string `json:"benefit_address" gorm:"type:string;size:191;not null;index"`
+		Amount         string `json:"amount" gorm:"type:string;size:191;not null"`
+		Network        string `json:"network" gorm:"type:string;size:191;not null;index"`
 		Status         int    `json:"status" gorm:"not null;default:0;index"`
 	}
 	return gormigrate.New(db, gormigrate.DefaultOptions, []*gormigrate.Migration{
@@ -109,32 +109,31 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 						return err
 					}
 				}
-				
+
 				if tx.Migrator().HasTable(&TaskFee{}) {
 					if err := tx.Migrator().DropTable(&TaskFee{}); err != nil {
 						return err
 					}
 				}
-				
+
 				if tx.Migrator().HasTable(&TaskFeeEvent{}) {
 					if err := tx.Migrator().DropTable(&TaskFeeEvent{}); err != nil {
 						return err
 					}
 				}
-				
-				
+
 				if tx.Migrator().HasTable(&TaskQuota{}) {
 					if err := tx.Migrator().DropTable(&TaskQuota{}); err != nil {
 						return err
 					}
 				}
-				
+
 				if tx.Migrator().HasTable(&TaskQuotaEvent{}) {
 					if err := tx.Migrator().DropTable(&TaskQuotaEvent{}); err != nil {
 						return err
 					}
 				}
-				
+
 				if tx.Migrator().HasTable(&WithdrawRecord{}) {
 					if err := tx.Migrator().DropTable(&WithdrawRecord{}); err != nil {
 						return err

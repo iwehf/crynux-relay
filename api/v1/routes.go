@@ -9,9 +9,10 @@ import (
 	"crynux_relay/api/v1/network"
 	"crynux_relay/api/v1/nodes"
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/v1/staking"
 	"crynux_relay/api/v1/stats"
+	"crynux_relay/api/v1/staking"
 	taskfee "crynux_relay/api/v1/task_fee"
+	taskquota "crynux_relay/api/v1/task_quota"
 	"crynux_relay/api/v1/time"
 	"crynux_relay/api/v1/withdraw"
 	"crynux_relay/api/v1/worker"
@@ -21,7 +22,6 @@ import (
 )
 
 func InitRoutes(r *fizz.Fizz) {
-
 	v1g := r.Group("v1", "ApiV1", "API version 1")
 
 	v1g.GET("now", []fizz.OperationOption{
@@ -234,6 +234,12 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Get task fee logs"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(taskfee.GetTaskFeeLogs, 200))
+
+	taskQuotaGroup := v1g.Group("task_quota", "task_quota", "task quota related APIs")
+	taskQuotaGroup.GET("/:address", []fizz.OperationOption{
+		fizz.Summary("Get task quota"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(taskquota.GetTaskQuota, 200))
 
 	withdrawGroup := v1g.Group("withdraw", "withdraw", "withdraw related APIs")
 	withdrawGroup.GET("/list", []fizz.OperationOption{

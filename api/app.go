@@ -2,6 +2,7 @@ package api
 
 import (
 	v1 "crynux_relay/api/v1"
+	"crynux_relay/api/tools"
 	responseV1 "crynux_relay/api/v1/response"
 	v2 "crynux_relay/api/v2"
 	"crynux_relay/config"
@@ -51,6 +52,8 @@ func GetHttpApplication(appConfig *config.AppConfig) *gin.Engine {
 
 	// Hello page
 	fizzEngine.GET("", []fizz.OperationOption{}, Hello)
+
+	tools.InitializeJWTManager()
 
 	// v1 api
 	v1.InitRoutes(fizzEngine)
