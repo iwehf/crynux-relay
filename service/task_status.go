@@ -27,7 +27,9 @@ func CreateTask(ctx context.Context, db *gorm.DB, task *models.InferenceTask) er
 		if err != nil {
 			return err
 		}
-		commitFunc()
+		if err := commitFunc(); err != nil {
+			return err
+		}
 		return nil
 	})
 }
@@ -310,7 +312,9 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		if err != nil {
 			return err
 		}
-		commitFunc()
+		if err := commitFunc(); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -372,7 +376,9 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 		if err != nil {
 			return err
 		}
-		commitFunc()
+		if err := commitFunc(); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -426,7 +432,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			})
 		}
 
-	} else {	
+	} else {
 		payments = append(payments, taskPayment{
 			taskIDCommitment: task.TaskIDCommitment,
 			address:          task.SelectedNode,
@@ -435,9 +441,9 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 	}
 
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		var commitFuncs []func()
+		var commitFuncs []func() error
 		for _, payment := range payments {
-			commitFunc, err := SendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment)
+			commitFunc, err := sendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment)
 			if err != nil {
 				return err
 			}
@@ -472,7 +478,9 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			return err
 		}
 		for _, commitFunc := range commitFuncs {
-			commitFunc()
+			if err := commitFunc(); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); err != nil {

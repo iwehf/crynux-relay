@@ -1,15 +1,13 @@
 package client
 
 import (
-	"context"
+	"crynux_relay/api/tools"
 	"crynux_relay/api/v1/middleware"
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/tools"
 	"crynux_relay/blockchain"
 	"crynux_relay/config"
-	"crynux_relay/models"
+	"crynux_relay/service"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -69,24 +67,15 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 		return nil, validationErr
 	}
 
-	withdrawRecored := &models.WithdrawRecord{
-		Address:        in.Address,
-		Amount:         models.BigInt{Int: *amount},
-		BenefitAddress: in.BenefitAddress,
-		Network:        in.Network,
-		Status:         models.WithdrawStatusPending,
-	}
-
-	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-	if err := config.GetDB().WithContext(dbCtx).Create(withdrawRecored).Error; err != nil {
+	record, err := service.Withdraw(c.Request.Context(), config.GetDB(), in.Address, in.BenefitAddress, amount, in.Network)
+	if err != nil {
 		log.Errorf("Error creating withdraw record: %v", err)
 		return nil, response.NewExceptionResponse(err)
 	}
 
 	return &CreateWithdrawResponse{
 		Data: &CreateWithdrawData{
-			RequestId: withdrawRecored.ID,
+			RequestId: record.ID,
 		},
 	}, nil
 

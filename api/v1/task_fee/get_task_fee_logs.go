@@ -38,29 +38,26 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInput) (*GetTaskFeeLogsRes
 	}
 
 	// Filter out events with non-consecutive IDs
+	logs := make([]TaskFeeLog, 0, len(events))
 	if len(events) > 0 {
 		lastID := events[0].ID
-		end := 1
-		
-		for ; end < len(events); end++ {
-			if events[end].ID == lastID+1 {
-				lastID = events[end].ID
-			} else {
+
+		for i, event := range events {
+			if i > 0 && event.ID != lastID+1 {
 				break
 			}
+
+			lastID = event.ID
+
+			logs = append(logs, TaskFeeLog{
+				ID: event.ID,
+				CreatedAt: event.CreatedAt,
+				Address: event.Address,
+				TaskFee: event.TaskFee.String(),
+			})
 		}
-		events = events[:end]
 	}
 
-	logs := make([]TaskFeeLog, 0, len(events))
-	for _, event := range events {
-		logs = append(logs, TaskFeeLog{
-			ID: event.ID,
-			CreatedAt: event.CreatedAt,
-			Address: event.Address,
-			TaskFee: event.TaskFee.String(),
-		})
-	}
 	return &GetTaskFeeLogsResponse{
 		Data: logs,
 	}, nil

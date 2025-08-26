@@ -37,6 +37,20 @@ func InitTaskFeeCache(ctx context.Context, db *gorm.DB) error {
 			return err
 		}
 	}
+	for {
+		events, err := getPendingWithdrawEvents(ctx, db, 50)
+		if err != nil {
+			return err
+		}
+
+		if len(events) == 0 {
+			break
+		}
+
+		if err := processPendingWithdrawEvents(ctx, db, events); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -50,6 +64,18 @@ func getPendingTaskFeeEvents(ctx context.Context, db *gorm.DB, limit int) ([]mod
 	}
 
 	return events, nil
+}
+
+func getPendingWithdrawEvents(ctx context.Context, db *gorm.DB, limit int) ([]models.WithdrawRecord, error) {
+	var withdrawRecords []models.WithdrawRecord
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	err := db.WithContext(dbCtx).Where("local_status = ?", models.WithdrawLocalStatusPending).Order("id").Limit(limit).Find(&withdrawRecords).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return withdrawRecords, nil
 }
 
 func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []models.TaskFeeEvent) ([]models.TaskFeeEvent, []models.TaskFeeEvent, error) {
@@ -93,6 +119,36 @@ func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mod
 		}
 	}
 
+	return validEvents, invalidEvents, nil
+}
+
+func validatePendingWithdrawEvents(ctx context.Context, db *gorm.DB, events []models.WithdrawRecord) ([]models.WithdrawRecord, []models.WithdrawRecord, error) {
+	var addresses []string
+	for _, event := range events {
+		addresses = append(addresses, event.Address)
+	}
+
+	var taskFees []models.TaskFee
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := db.WithContext(dbCtx).Where("address IN (?)", addresses).Find(&taskFees).Error; err != nil {
+		return nil, nil, err
+	}
+
+	existedTaskFeeAddressMap := make(map[string]struct{})
+	for _, taskFee := range taskFees {
+		existedTaskFeeAddressMap[taskFee.Address] = struct{}{}
+	}
+
+	validEvents := make([]models.WithdrawRecord, 0)
+	invalidEvents := make([]models.WithdrawRecord, 0)
+	for _, event := range events {
+		if _, exists := existedTaskFeeAddressMap[event.Address]; exists {
+			validEvents = append(validEvents, event)
+		} else {
+			invalidEvents = append(invalidEvents, event)
+		}
+	}
 	return validEvents, invalidEvents, nil
 }
 
@@ -151,6 +207,21 @@ func mergeTaskFeeEvents(events []models.TaskFeeEvent) map[string]*big.Int {
 		}
 	}
 	return mergedTaskFees
+}
+
+func mergeWithdrawEvents(events []models.WithdrawRecord) map[string]*big.Int {
+	mergedWithdrawFees := make(map[string]*big.Int)
+	for _, event := range events {
+		if _, exists := mergedWithdrawFees[event.Address]; !exists {
+			mergedWithdrawFees[event.Address] = big.NewInt(0)
+		}
+		if event.Status == models.WithdrawStatusFailed {
+			mergedWithdrawFees[event.Address].Add(mergedWithdrawFees[event.Address], &event.Amount.Int)
+		} else {
+			mergedWithdrawFees[event.Address].Sub(mergedWithdrawFees[event.Address], &event.Amount.Int)
+		}
+	}
+	return mergedWithdrawFees
 }
 
 func processPendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []models.TaskFeeEvent) error {
@@ -230,6 +301,73 @@ func processPendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mode
 	})
 }
 
+func processPendingWithdrawEvents(ctx context.Context, db *gorm.DB, events []models.WithdrawRecord) error {
+	validEvents, invalidEvents, err := validatePendingWithdrawEvents(ctx, db, events)
+	if err != nil {
+		return err
+	}
+
+	if len(invalidEvents) != 0 {
+		var invalidEventIDs []uint
+		for _, event := range invalidEvents {
+			invalidEventIDs = append(invalidEventIDs, event.ID)
+		}
+		if err := db.Model(&models.WithdrawRecord{}).Where("id IN (?)", invalidEventIDs).Update("local_status", models.WithdrawLocalStatusInvalid).Error; err != nil {
+			return err
+		}
+	}
+
+	mergedWithdrawFees := mergeWithdrawEvents(validEvents)
+
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var eventIDs []uint
+	for _, event := range validEvents {
+		eventIDs = append(eventIDs, event.ID)
+	}
+
+	var addresses []string
+	for address := range mergedWithdrawFees {
+		addresses = append(addresses, address)
+	}
+
+	return db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
+		var existedTaskFees []models.TaskFee
+		if err := tx.Model(&models.TaskFee{}).Where("address IN (?)", addresses).Find(&existedTaskFees).Error; err != nil {
+			return err
+		}
+
+		existedAddresses := make([]string, len(existedTaskFees))
+		existedTaskFeesMap := make(map[string]*models.TaskFee)
+		for i, taskFee := range existedTaskFees {
+			existedTaskFeesMap[taskFee.Address] = &existedTaskFees[i]
+			existedAddresses[i] = taskFee.Address
+		}
+
+		for address, amount := range mergedWithdrawFees {
+			if taskFee, exists := existedTaskFeesMap[address]; exists {
+				taskFee.TaskFee.Int.Add(&taskFee.TaskFee.Int, amount)
+			}
+		}
+
+		var cases string
+		for _, taskFee := range existedTaskFeesMap {
+			cases += fmt.Sprintf(" WHEN address = '%s' THEN '%s'", taskFee.Address, taskFee.TaskFee.String())
+		}
+		if err := tx.Model(&models.TaskFee{}).Where("address IN (?)", existedAddresses).
+			Update("task_fee", gorm.Expr("CASE"+cases+" END")).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id IN (?)", eventIDs).Where("local_status = ?", models.WithdrawLocalStatusPending).Update("local_status", models.WithdrawLocalStatusProcessed).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 	for {
 		select {
@@ -255,7 +393,29 @@ func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 			}()
 
 			if err != nil {
-				log.Errorf("Failed to sync task fees: %v", err)
+				log.Errorf("Failed to sync task fee events: %v", err)
+			}
+
+			err = func() error {
+				for {
+					events, err := getPendingWithdrawEvents(ctx, db, 50)
+					if err != nil {
+						return err
+					}
+
+					if len(events) == 0 {
+						break
+					}
+
+					if err := processPendingWithdrawEvents(ctx, db, events); err != nil {
+						return err
+					}
+				}
+				return nil
+			}()
+
+			if err != nil {
+				log.Errorf("Failed to sync withdraw events: %v", err)
 			}
 
 			// Wait for 2 seconds before next iteration
@@ -269,8 +429,7 @@ func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 	}
 }
 
-
-func SendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func (), error) {
+func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func() error, error) {
 	event := &models.TaskFeeEvent{
 		TaskIDCommitment: taskIDCommitment,
 		Address:          address,
@@ -288,10 +447,50 @@ func SendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 		return nil, err
 	}
 	amountCopy := new(big.Int).Set(amount)
-	commitFunc := func() {
+	commitFunc := func() error {
 		taskFeeCache.mu.Lock()
 		defer taskFeeCache.mu.Unlock()
 		taskFee.Add(taskFee, amountCopy)
+		return nil
+	}
+
+	return commitFunc, nil
+}
+
+func withdrawTaskFee(ctx context.Context, db *gorm.DB, address string, amount *big.Int) (func() error, error) {
+	taskFee, err := getTaskFeeFromCache(ctx, db, address)
+	if err != nil {
+		return nil, err
+	}
+	if taskFee.Cmp(amount) < 0 {
+		return nil, fmt.Errorf("insufficient task fee when withdraw")
+	}
+	amountCopy := new(big.Int).Set(amount)
+	commitFunc := func() error {
+		taskFeeCache.mu.Lock()
+		defer taskFeeCache.mu.Unlock()
+		if taskFee.Cmp(amountCopy) < 0 {
+			return fmt.Errorf("insufficient task fee when withdraw")
+		}
+		taskFee.Sub(taskFee, amountCopy)
+		return nil
+	}
+
+	return commitFunc, nil
+}
+
+func rejectWithdrawTaskFee(ctx context.Context, db *gorm.DB, address string, amount *big.Int) (func() error, error) {
+	taskFee, err := getTaskFeeFromCache(ctx, db, address)
+	if err != nil {
+		return nil, err
+	}
+
+	amountCopy := new(big.Int).Set(amount)
+	commitFunc := func() error {
+		taskFeeCache.mu.Lock()
+		defer taskFeeCache.mu.Unlock()
+		taskFee.Add(taskFee, amountCopy)
+		return nil
 	}
 
 	return commitFunc, nil

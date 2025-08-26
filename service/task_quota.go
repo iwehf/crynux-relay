@@ -325,7 +325,7 @@ func syncTaskQuotasToDB(ctx context.Context, db *gorm.DB) error {
 	}
 }
 
-func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func(), error) {
+func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
 
 	event := &models.TaskQuotaEvent{
 		Reason:        fmt.Sprintf("%d-%s-%s", models.TaskQuotaTypeBought, txHash, network),
@@ -345,16 +345,26 @@ func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amou
 		return nil, err
 	}
 	amountCopy := new(big.Int).Set(amount)
-	commitFunc := func() {
+	commitFunc := func() error {
 		taskQuotaCache.mu.Lock()
 		defer taskQuotaCache.mu.Unlock()
 		taskQuota.Add(taskQuota, amountCopy)
+		return nil
 	}
 
 	return commitFunc, nil
 }
 
-func SpendTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func(), error) {
+func SpendTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func() error, error) {
+	taskQuota, err := getTaskQuotaFromCache(ctx, db, address)
+	if err != nil {
+		return nil, err
+	}
+
+	if taskQuota.Cmp(amount) < 0 {
+		return nil, fmt.Errorf("insufficient task quota when spend")
+	}
+
 	event := &models.TaskQuotaEvent{
 		Reason:        fmt.Sprintf("%d-%s", models.TaskQuotaTypeSpent, taskIDCommitment),
 		Address:       address,
@@ -368,22 +378,22 @@ func SpendTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 		return nil, err
 	}
 
-	taskQuota, err := getTaskQuotaFromCache(ctx, db, address)
-	if err != nil {
-		return nil, err
-	}
 	amountCopy := new(big.Int).Set(amount)
-	commitFunc := func() {
+	commitFunc := func() error {
 		taskQuotaCache.mu.Lock()
 		defer taskQuotaCache.mu.Unlock()
+		if taskQuota.Cmp(amountCopy) < 0 {
+			return fmt.Errorf("insufficient task quota when spend")
+		}
 		taskQuota.Sub(taskQuota, amountCopy)
+		return nil
 	}
 
 	return commitFunc, nil
 
 }
 
-func RefundTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func(), error) {
+func RefundTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func() error, error) {
 	event := &models.TaskQuotaEvent{
 		Reason:        fmt.Sprintf("%d-%s", models.TaskQuotaTypeRefunded, taskIDCommitment),
 		Address:       address,
@@ -402,10 +412,11 @@ func RefundTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address
 		return nil, err
 	}
 	amountCopy := new(big.Int).Set(amount)
-	commitFunc := func() {
+	commitFunc := func() error {
 		taskQuotaCache.mu.Lock()
 		defer taskQuotaCache.mu.Unlock()
 		taskQuota.Add(taskQuota, amountCopy)
+		return nil
 	}
 
 	return commitFunc, nil
@@ -564,7 +575,10 @@ func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction,
 	}
 
 	// Execute quota update
-	commitFunc()
+	if err := commitFunc(); err != nil {
+		log.Errorf("Failed to buy task quota for %s: %v", from.Hex(), err)
+		return err
+	}
 
 	log.Infof("Processed native token transfer: %s -> %s, amount: %s", from.Hex(), tx.To().Hex(), tx.Value().String())
 

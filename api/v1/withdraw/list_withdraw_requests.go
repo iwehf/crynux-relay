@@ -13,7 +13,6 @@ import (
 type GetWithdrawRequestsInput struct {
 	StartID uint                   `query:"start_id" json:"start_id" description:"Start ID"`
 	Limit   int                    `query:"limit" json:"limit" description:"Limit"`
-	Status  *models.WithdrawStatus `query:"status" json:"status" description:"Status"`
 }
 
 type WithdrawRecord struct {
@@ -36,25 +35,33 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInput) (*GetWith
 	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
-	dbi := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id > ?", in.StartID)
-	if in.Status != nil {
-		dbi = dbi.Where("status = ?", *in.Status)
-	}
-
-	if err := dbi.Order("id ASC").Limit(in.Limit).Find(&records).Error; err != nil {
+	if err := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id > ?", in.StartID).Order("id ASC").Limit(in.Limit).Find(&records).Error; err != nil {
 		return nil, err
 	}
 
 	results := make([]WithdrawRecord, 0, len(records))
-	for _, record := range records {
-		results = append(results, WithdrawRecord{
-			ID:             record.ID,
-			Address:        record.Address,
-			BenefitAddress: record.BenefitAddress,
-			Amount:         record.Amount.String(),
-			Network:        record.Network,
-			Status:         record.Status,
-		})
+	if len(records) > 0 {
+		lastID := records[0].ID
+		for i, record := range records {
+			if i > 0 && record.ID != lastID+1 {
+				break
+			}
+
+			lastID = record.ID
+
+			if record.LocalStatus != models.WithdrawLocalStatusProcessed {
+				break
+			}
+	
+			results = append(results, WithdrawRecord{
+				ID:             record.ID,
+				Address:        record.Address,
+				BenefitAddress: record.BenefitAddress,
+				Amount:         record.Amount.String(),
+				Network:        record.Network,
+				Status:         record.Status,
+			})
+		}
 	}
 
 	return &GetWithdrawRequestsResponse{
