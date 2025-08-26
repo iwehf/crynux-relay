@@ -12,15 +12,25 @@ import (
 )
 
 type GetWithdrawRecordsInput struct {
-	Page     uint `json:"page" form:"page" description:"The page number" default:"1"`
-	PageSize uint `json:"page_size" form:"page_size" description:"The page size" default:"10"`
-	Network  *string `json:"network" form:"network" description:"The network of the withdraw"`
-	Status   *models.WithdrawStatus `json:"status" form:"status" description:"The status of the withdraw"`
+	Address  string                 `path:"address" description:"The address of the user"`
+	Page     uint                   `query:"page" description:"The page number" default:"1"`
+	PageSize uint                   `query:"page_size" description:"The page size" default:"10"`
+	Network  *string                `query:"network" description:"The network of the withdraw"`
+	Status   *models.WithdrawStatus `query:"status" description:"The status of the withdraw"`
+}
+
+type WithdrawRecord struct {
+	ID             uint                  `json:"id"`
+	Address        string                `json:"address"`
+	BenefitAddress string                `json:"benefit_address"`
+	Amount         string                `json:"amount"`
+	Network        string                `json:"network"`
+	Status         models.WithdrawStatus `json:"status"`
 }
 
 type GetWithdrawRecordsData struct {
-	Total           int64                   `json:"total" description:"The total number of withdraw records"`
-	WithdrawRecords []models.WithdrawRecord `json:"withdraw_records" description:"The withdraw records"`
+	Total           int64            `json:"total" description:"The total number of withdraw records"`
+	WithdrawRecords []WithdrawRecord `json:"withdraw_records" description:"The withdraw records"`
 }
 
 type GetWithdrawRecordsResponse struct {
@@ -38,7 +48,12 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 
 	address := middleware.GetUserAddress(c)
 
-	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5 * time.Second)
+	if address != in.Address {
+		validationErr := response.NewValidationErrorResponse("address", "Address mismatch")
+		return nil, validationErr
+	}
+
+	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	db := config.GetDB()
@@ -63,10 +78,22 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 		return nil, err
 	}
 
+	results := make([]WithdrawRecord, len(withdrawRecords))
+	for i, record := range withdrawRecords {
+		results[i] = WithdrawRecord{
+			ID:             record.ID,
+			Address:        record.Address,
+			BenefitAddress: record.BenefitAddress,
+			Amount:         record.Amount.String(),
+			Network:        record.Network,
+			Status:         record.Status,
+		}
+	}
+
 	return &GetWithdrawRecordsResponse{
 		Data: &GetWithdrawRecordsData{
-			Total: total,
-			WithdrawRecords: withdrawRecords,
+			Total:           total,
+			WithdrawRecords: results,
 		},
 	}, nil
 }

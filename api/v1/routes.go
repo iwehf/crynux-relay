@@ -260,11 +260,11 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Connect wallet"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(client.ConnectWallet, 200))
-	clientGroup.POST("/withdraw", []fizz.OperationOption{
+	clientGroup.POST("/:address/withdraw", []fizz.OperationOption{
 		fizz.Summary("Create withdraw request"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.CreateWithdrawRequest, 200))
-	clientGroup.GET("/withdraw/list", []fizz.OperationOption{
+	clientGroup.GET("/:address/withdraw/list", []fizz.OperationOption{
 		fizz.Summary("Get withdraw records"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetWithdrawRecords, 200))

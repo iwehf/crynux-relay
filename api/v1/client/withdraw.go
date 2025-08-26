@@ -18,7 +18,7 @@ import (
 )
 
 type CreateWithdrawInput struct {
-	Address        string `json:"address" form:"address" validate:"required" description:"The address of the user"`
+	Address        string `path:"address" json:"address" form:"address" validate:"required" description:"The address of the user"`
 	Amount         string `json:"amount" form:"amount" validate:"required" description:"The amount of the withdraw"`
 	BenefitAddress string `json:"benefit_address" form:"benefit_address" validate:"required" description:"The address of the benefit"`
 	Network        string `json:"network" form:"network" validate:"required" description:"The network of the withdraw"`

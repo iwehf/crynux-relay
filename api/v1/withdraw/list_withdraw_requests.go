@@ -17,11 +17,12 @@ type GetWithdrawRequestsInput struct {
 }
 
 type WithdrawRecord struct {
-	ID             uint   `json:"id"`
-	Address        string `json:"address"`
-	BenefitAddress string `json:"benefit_address"`
-	Amount         string `json:"amount"`
-	Network        string `json:"network"`
+	ID             uint                  `json:"id"`
+	Address        string                `json:"address"`
+	BenefitAddress string                `json:"benefit_address"`
+	Amount         string                `json:"amount"`
+	Network        string                `json:"network"`
+	Status         models.WithdrawStatus `json:"status"`
 }
 
 type GetWithdrawRequestsResponse struct {
@@ -52,6 +53,7 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInput) (*GetWith
 			BenefitAddress: record.BenefitAddress,
 			Amount:         record.Amount.String(),
 			Network:        record.Network,
+			Status:         record.Status,
 		})
 	}
 
