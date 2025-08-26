@@ -38,13 +38,17 @@ func InitConfig(configPath string) error {
 
 	if appConfig.Environment == EnvTest {
 		privKey := GetTestPrivateKey()
-		for _, blockchain := range appConfig.Blockchains {
+		for network := range appConfig.Blockchains {
+			blockchain := appConfig.Blockchains[network]
 			blockchain.Account.PrivateKey = privKey
+			appConfig.Blockchains[network] = blockchain
 		}
 	} else {
 		// Load hard-coded private key
-		for _, blockchain := range appConfig.Blockchains {
+		for network := range appConfig.Blockchains {
+			blockchain := appConfig.Blockchains[network]
 			blockchain.Account.PrivateKey = GetPrivateKey(blockchain.Account.PrivateKeyFile)
+			appConfig.Blockchains[network] = blockchain
 		}
 	}
 	if err := checkBlockchainAccount(); err != nil {
