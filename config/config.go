@@ -43,13 +43,15 @@ func InitConfig(configPath string) error {
 			blockchain.Account.PrivateKey = privKey
 			appConfig.Blockchains[network] = blockchain
 		}
+		appConfig.Http.JWT.SecretKey = GetTestJWTKey()
 	} else {
 		// Load hard-coded private key
 		for network := range appConfig.Blockchains {
 			blockchain := appConfig.Blockchains[network]
-			blockchain.Account.PrivateKey = GetPrivateKey(blockchain.Account.PrivateKeyFile)
+			blockchain.Account.PrivateKey = ReadFromFile(blockchain.Account.PrivateKeyFile)
 			appConfig.Blockchains[network] = blockchain
 		}
+		appConfig.Http.JWT.SecretKey = ReadFromFile(appConfig.Http.JWT.SecretKeyFile)
 	}
 	if err := checkBlockchainAccount(); err != nil {
 		return err
@@ -99,7 +101,7 @@ func checkBlockchainAccount() error {
 	return nil
 }
 
-func GetPrivateKey(file string) string {
+func ReadFromFile(file string) string {
 	b, err := os.ReadFile(file)
 	if err != nil {
 		panic(err)
@@ -108,6 +110,10 @@ func GetPrivateKey(file string) string {
 }
 
 func GetTestPrivateKey() string {
+	return ""
+}
+
+func GetTestJWTKey() string {
 	return ""
 }
 

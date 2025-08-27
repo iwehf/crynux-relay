@@ -12,7 +12,7 @@ type WithdrawRecord struct {
 	LocalStatus    WithdrawLocalStatus `json:"local_status" gorm:"not null;default:0;index"`
 }
 
-type WithdrawStatus int
+type WithdrawStatus int8
 
 const (
 	WithdrawStatusPending WithdrawStatus = iota
@@ -20,7 +20,7 @@ const (
 	WithdrawStatusFailed
 )
 
-type WithdrawLocalStatus int
+type WithdrawLocalStatus int8
 
 const (
 	WithdrawLocalStatusPending WithdrawLocalStatus = iota

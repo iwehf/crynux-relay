@@ -74,7 +74,7 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 	}
 
 	var withdrawRecords []models.WithdrawRecord
-	if err := dbi.Offset(int((in.Page - 1) * in.PageSize)).Limit(int(in.PageSize)).Find(&withdrawRecords).Error; err != nil {
+	if err := dbi.Order("id DESC").Offset(int((in.Page - 1) * in.PageSize)).Limit(int(in.PageSize)).Find(&withdrawRecords).Error; err != nil {
 		return nil, err
 	}
 

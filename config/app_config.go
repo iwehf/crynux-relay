@@ -35,6 +35,7 @@ type AppConfig struct {
 
 		JWT struct {
 			SecretKey string `mapstructure:"secret_key"`
+			SecretKeyFile string `mapstructure:"secret_key_file"`
 			ExpiresIn uint64 `mapstructure:"expires_in"`
 		} `mapstructure:"jwt"`
 	} `mapstructure:"http"`
@@ -73,4 +74,8 @@ type AppConfig struct {
 		GPTInference                string `mapstructure:"gpt_inference"`
 		StableDiffusionFinetuneLora string `mapstructure:"stable_diffusion_finetune_lora"`
 	} `mapstructure:"task_schema"`
+
+	Wallet struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"wallet"`
 }

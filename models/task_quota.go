@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type TaskQuotaEventStatus int
+type TaskQuotaEventStatus int8
 
 const (
 	TaskQuotaEventStatusPending TaskQuotaEventStatus = iota
@@ -17,7 +17,7 @@ const (
 	TaskQuotaEventStatusInvalid
 )
 
-type TaskQuotaType int
+type TaskQuotaType int8
 
 const (
 	TaskQuotaTypeBought TaskQuotaType = iota

@@ -7,7 +7,7 @@ import (
 
 func M20250826(db *gorm.DB) *gormigrate.Gormigrate {
 	type WithdrawRecord struct {
-		LocalStatus    int `json:"local_status" gorm:"not null;default:0;index"`
+		LocalStatus    int8 `json:"local_status" gorm:"not null;default:0;index"`
 	}
 	
 	return gormigrate.New(db, gormigrate.DefaultOptions, []*gormigrate.Migration{

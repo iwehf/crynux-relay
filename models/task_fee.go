@@ -12,7 +12,7 @@ type TaskFee struct {
 	TaskFee BigInt `json:"task_fee" gorm:"type:string;size:255"`
 }
 
-type TaskFeeEventStatus int
+type TaskFeeEventStatus int8
 
 const (
 	TaskFeeEventStatusPending TaskFeeEventStatus = iota

@@ -18,6 +18,7 @@ type ConnectWalletInput struct {
 // ConnectWalletOutput defines the output structure for wallet connection
 type ConnectWalletOutput struct {
 	Token string `json:"token" description:"JWT token for authentication"`
+	ExpiresAt int64 `json:"expires_at" description:"JWT token expiration time"`
 }
 
 // ConnectWalletResponse defines the API response structure
@@ -47,7 +48,7 @@ func ConnectWallet(c *gin.Context, in *ConnectWalletInput) (*ConnectWalletRespon
 	}
 
 	// Generate JWT token for the authenticated user
-	token, err := tools.GenerateToken(in.Address)
+	token, exp, err := tools.GenerateToken(in.Address)
 	if err != nil {
 		log.Errorf("Error generating JWT token: %v", err)
 		return nil, err
@@ -55,7 +56,8 @@ func ConnectWallet(c *gin.Context, in *ConnectWalletInput) (*ConnectWalletRespon
 
 	// Create response with token
 	output := &ConnectWalletOutput{
-		Token: token,
+		Token:     token,
+		ExpiresAt: exp.Unix(),
 	}
 
 	return &ConnectWalletResponse{

@@ -29,20 +29,26 @@ func NewJWTManager(secretKey string, expiresIn time.Duration) *JWTManager {
 }
 
 // GenerateToken generates a new JWT token for the given address
-func (jm *JWTManager) GenerateToken(address string) (string, error) {
+func (jm *JWTManager) GenerateToken(address string) (string, time.Time, error) {
+	now := time.Now()
+	exp := now.Add(jm.expiresIn)
 	claims := &JWTClaims{
 		Address: address,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(jm.expiresIn)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(exp),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    "crynux-relay",
 			Subject:   address,
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jm.secretKey)
+	tokenString, err := token.SignedString(jm.secretKey)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return tokenString, exp, nil
 }
 
 // ValidateToken validates and parses a JWT token
@@ -84,7 +90,7 @@ func InitializeJWTManager() {
 }
 
 // GenerateToken generates a JWT token with default settings
-func GenerateToken(address string) (string, error) {
+func GenerateToken(address string) (string, time.Time, error) {
 	return DefaultJWTManager.GenerateToken(address)
 }
 

@@ -54,7 +54,7 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 		TaskIDCommitment string    `json:"task_id_commitment" gorm:"type:string;size:191;not null;uniqueIndex"`
 		Address          string    `json:"address" gorm:"type:string;size:191;not null;index"`
 		TaskFee          string    `json:"task_fee" gorm:"type:string;size:191;not null"`
-		Status           int       `json:"status" gorm:"not null;default:0;index"`
+		Status           int8       `json:"status" gorm:"not null;default:0;index"`
 	}
 
 	type TaskQuota struct {
@@ -68,8 +68,8 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 		CreatedAt     time.Time `json:"created_at" gorm:"not null"`
 		Address       string    `json:"address" gorm:"type:string;size:191;not null;index"`
 		Quota         string    `json:"quota" gorm:"type:string;size:191;not null"`
-		Status        int       `json:"status" gorm:"not null;default:0;index"`
-		TaskQuotaType int       `json:"task_quota_type" gorm:"type:int;not null;index"`
+		Status        int8       `json:"status" gorm:"not null;default:0;index"`
+		TaskQuotaType int8       `json:"task_quota_type" gorm:"not null;index"`
 		Reason        string    `json:"reason" gorm:"type:string;size:191;not null;uniqueIndex"`
 	}
 
@@ -79,7 +79,7 @@ func M20250821(db *gorm.DB) *gormigrate.Gormigrate {
 		BenefitAddress string `json:"benefit_address" gorm:"type:string;size:191;not null;index"`
 		Amount         string `json:"amount" gorm:"type:string;size:191;not null"`
 		Network        string `json:"network" gorm:"type:string;size:191;not null;index"`
-		Status         int    `json:"status" gorm:"not null;default:0;index"`
+		Status         int8    `json:"status" gorm:"not null;default:0;index"`
 	}
 	return gormigrate.New(db, gormigrate.DefaultOptions, []*gormigrate.Migration{
 		{

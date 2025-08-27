@@ -10,6 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrWithdrawRequestNotPending = errors.New("withdraw request is not pending")
+var ErrWithdrawRequestNotProcessedLocally = errors.New("withdraw request has not been processed locally")
+
 func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, amount *big.Int, network string) (*models.WithdrawRecord, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -55,11 +58,11 @@ func FufillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 		}
 
 		if record.Status != models.WithdrawStatusPending {
-			return errors.New("withdraw request is not pending")
+			return ErrWithdrawRequestNotPending
 		}
 
 		if record.LocalStatus != models.WithdrawLocalStatusProcessed {
-			return errors.New("withdraw request has not been processed locally")
+			return ErrWithdrawRequestNotProcessedLocally
 		}
 
 		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusSuccess).Error; err != nil {
@@ -84,11 +87,11 @@ func RejectWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 		}
 
 		if record.Status != models.WithdrawStatusPending {
-			return errors.New("withdraw request is not pending")
+			return ErrWithdrawRequestNotPending
 		}
 
 		if record.LocalStatus != models.WithdrawLocalStatusProcessed {
-			return errors.New("withdraw request has not been processed locally")
+			return ErrWithdrawRequestNotProcessedLocally
 		}
 
 		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Update("local_status", models.WithdrawLocalStatusPending).Error; err != nil {
