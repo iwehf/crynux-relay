@@ -46,7 +46,7 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 	return record, nil
 }
 
-func FufillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
+func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

@@ -9,8 +9,8 @@ import (
 	"crynux_relay/api/v1/network"
 	"crynux_relay/api/v1/nodes"
 	"crynux_relay/api/v1/response"
-	"crynux_relay/api/v1/stats"
 	"crynux_relay/api/v1/staking"
+	"crynux_relay/api/v1/stats"
 	taskfee "crynux_relay/api/v1/task_fee"
 	taskquota "crynux_relay/api/v1/task_quota"
 	"crynux_relay/api/v1/time"
@@ -246,10 +246,10 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Get withdraw requests"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(withdraw.GetWithdrawRequests, 200))
-	withdrawGroup.POST("/:id/fufill", []fizz.OperationOption{
-		fizz.Summary("Fufill withdraw request"),
+	withdrawGroup.POST("/:id/fulfill", []fizz.OperationOption{
+		fizz.Summary("Fulfill withdraw request"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(withdraw.FufillWithdrawRequest, 200))
+	}, tonic.Handler(withdraw.FulfillWithdrawRequest, 200))
 	withdrawGroup.POST("/:id/reject", []fizz.OperationOption{
 		fizz.Summary("Reject withdraw request"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),

@@ -6,26 +6,27 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/service"
 	"errors"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type FufillWithdrawRequestInput struct {
+type FulfillWithdrawRequestInput struct {
 	ID uint `path:"id" json:"id" description:"Withdraw request ID"`
 }
 
-type FufillWithdrawRequestInputWithSignature struct {
-	FufillWithdrawRequestInput
+type FulfillWithdrawRequestInputWithSignature struct {
+	FulfillWithdrawRequestInput
 	Timestamp int64  `form:"timestamp" json:"timestamp" description:"Signature timestamp" validate:"required"`
 	Signature string `form:"signature" json:"signature" description:"Signature" validate:"required"`
 }
 
-type FufillWithdrawRequestResponse struct {
+type FulfillWithdrawRequestResponse struct {
 	response.Response
 }
 
-func FufillWithdrawRequest(c *gin.Context, in *FufillWithdrawRequestInputWithSignature) (*FufillWithdrawRequestResponse, error) {
-	match, address, err := validate.ValidateSignature(in.FufillWithdrawRequestInput, in.Timestamp, in.Signature)
+func FulfillWithdrawRequest(c *gin.Context, in *FulfillWithdrawRequestInputWithSignature) (*FulfillWithdrawRequestResponse, error) {
+	match, address, err := validate.ValidateSignature(in.FulfillWithdrawRequestInput, in.Timestamp, in.Signature)
 
 	if err != nil || !match {
 		validationErr := response.NewValidationErrorResponse("signature", "Invalid signature")
@@ -37,7 +38,7 @@ func FufillWithdrawRequest(c *gin.Context, in *FufillWithdrawRequestInputWithSig
 		return nil, validationErr
 	}
 
-	if err := service.FufillWithdraw(c.Request.Context(), config.GetDB(), in.ID); err != nil {
+	if err := service.FulfillWithdraw(c.Request.Context(), config.GetDB(), in.ID); err != nil {
 		if errors.Is(err, service.ErrWithdrawRequestNotPending) || errors.Is(err, service.ErrWithdrawRequestNotProcessedLocally) {
 			validationErr := response.NewValidationErrorResponse("id", err.Error())
 			return nil, validationErr
@@ -48,5 +49,5 @@ func FufillWithdrawRequest(c *gin.Context, in *FufillWithdrawRequestInputWithSig
 		return nil, response.NewExceptionResponse(err)
 	}
 
-	return &FufillWithdrawRequestResponse{}, nil
+	return &FulfillWithdrawRequestResponse{}, nil
 }
