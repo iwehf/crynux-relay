@@ -57,12 +57,16 @@ func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return err
 		}
 
-		if record.Status != models.WithdrawStatusPending {
-			return ErrWithdrawRequestNotPending
+		if record.Status == models.WithdrawStatusSuccess {
+			return nil
 		}
 
 		if record.LocalStatus != models.WithdrawLocalStatusProcessed {
 			return ErrWithdrawRequestNotProcessedLocally
+		}
+
+		if record.Status != models.WithdrawStatusPending {
+			return ErrWithdrawRequestNotPending
 		}
 
 		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusSuccess).Error; err != nil {
@@ -86,12 +90,16 @@ func RejectWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return err
 		}
 
-		if record.Status != models.WithdrawStatusPending {
-			return ErrWithdrawRequestNotPending
+		if record.Status == models.WithdrawStatusFailed {
+			return nil
 		}
 
 		if record.LocalStatus != models.WithdrawLocalStatusProcessed {
 			return ErrWithdrawRequestNotProcessedLocally
+		}
+
+		if record.Status != models.WithdrawStatusPending {
+			return ErrWithdrawRequestNotPending
 		}
 
 		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Update("local_status", models.WithdrawLocalStatusPending).Error; err != nil {

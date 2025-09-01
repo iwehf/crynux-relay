@@ -2,8 +2,11 @@ package blockchain
 
 import (
 	"context"
+	"crynux_relay/config"
 	"crynux_relay/models"
+	"database/sql"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -155,6 +158,26 @@ func (tc *TransactionConfirmer) confirmTransaction(ctx context.Context, transact
 		log.Warnf("Transaction %d has no tx hash", transaction.ID)
 		return nil
 	}
+	if !transaction.SentAt.Valid {
+		log.Warnf("Transaction %d has no sent at", transaction.ID)
+		return nil
+	}
+
+	appConfig := config.GetConfig()
+	blockchain, ok := appConfig.Blockchains[transaction.Network]
+	if !ok {
+		return fmt.Errorf("network %s not found", transaction.Network)
+	}
+
+	waitDeadline := transaction.SentAt.Time.Add(time.Duration(blockchain.ReceiptWaitTime) * time.Second)
+	if time.Now().After(waitDeadline) {
+		log.Warnf("Transaction %d has waited too long for receipt", transaction.ID)
+		if err := tc.handleTimedOutTransaction(ctx, transaction); err != nil {
+			log.Errorf("Failed to handle timed out transaction: %v", err)
+			return err
+		}
+		return nil
+	}
 
 	txHash := common.HexToHash(transaction.TxHash.String)
 
@@ -198,7 +221,7 @@ func (tc *TransactionConfirmer) confirmTransaction(ctx context.Context, transact
 // handleSuccessfulTransaction handles a successful transaction
 func (tc *TransactionConfirmer) handleSuccessfulTransaction(ctx context.Context, transaction *models.BlockchainTransaction, receipt *types.Receipt) error {
 	// Update transaction with receipt information
-	if err := transaction.UpdateTransactionReceipt(ctx, tc.db, receipt, ""); err != nil {
+	if err := transaction.MarkConfirmed(ctx, tc.db, receipt.BlockNumber.Int64(), int64(receipt.GasUsed), receipt.EffectiveGasPrice.String()); err != nil {
 		return err
 	}
 
@@ -215,10 +238,75 @@ func (tc *TransactionConfirmer) handleFailedTransaction(ctx context.Context, cli
 	}
 
 	// Update transaction with receipt information
-	if err := transaction.UpdateTransactionReceipt(ctx, tc.db, receipt, errorMsg); err != nil {
+	if err := tc.db.Transaction(func(tx *gorm.DB) error {
+		if err := transaction.MarkFailed(ctx, tx, receipt.BlockNumber.Int64(), int64(receipt.GasUsed), receipt.EffectiveGasPrice.String(), errorMsg); err != nil {
+			return err
+		}
+		if transaction.RetryCount < transaction.MaxRetries {
+			appConfig := config.GetConfig()
+			blockchain, ok := appConfig.Blockchains[transaction.Network]
+			if !ok {
+				return fmt.Errorf("network %s not found", transaction.Network)
+			}
+			nextTransaction := &models.BlockchainTransaction{
+				Network: transaction.Network,
+				Type: transaction.Type,
+				Status: models.TransactionStatusPending,
+				FromAddress: transaction.FromAddress,
+				ToAddress: transaction.ToAddress,
+				Value: transaction.Value,
+				Data: transaction.Data,
+				RetryCount: transaction.RetryCount + 1,
+				MaxRetries: transaction.MaxRetries,
+				NextRetryAt: sql.NullTime{Time: time.Now().Add(time.Duration(blockchain.RetryInterval) * time.Second)},
+				LastRetryAt: transaction.SentAt,
+			}
+			if err := nextTransaction.Save(ctx, tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
 	log.Infof("Transaction %d failed, will retry (attempt %d/%d)", transaction.ID, transaction.RetryCount+1, transaction.MaxRetries)
+
+	return nil
+}
+
+func (tc *TransactionConfirmer) handleTimedOutTransaction(ctx context.Context, transaction *models.BlockchainTransaction) error {
+	if err := tc.db.Transaction(func(tx *gorm.DB) error {
+		if err := transaction.MarkFailed(ctx, tx, 0, 0, "", "Transaction timed out"); err != nil {
+			return err
+		}
+		if transaction.RetryCount < transaction.MaxRetries {
+			appConfig := config.GetConfig()
+			blockchain, ok := appConfig.Blockchains[transaction.Network]
+			if !ok {
+				return fmt.Errorf("network %s not found", transaction.Network)
+			}
+			nextTransaction := &models.BlockchainTransaction{
+				Network: transaction.Network,
+				Type: transaction.Type,
+				Status: models.TransactionStatusPending,
+				FromAddress: transaction.FromAddress,
+				ToAddress: transaction.ToAddress,
+				Value: transaction.Value,
+				Data: transaction.Data,
+				RetryCount: transaction.RetryCount + 1,
+				MaxRetries: transaction.MaxRetries,
+				NextRetryAt: sql.NullTime{Time: time.Now().Add(time.Duration(blockchain.RetryInterval) * time.Second)},
+				LastRetryAt: transaction.SentAt,
+			}
+			if err := nextTransaction.Save(ctx, tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	log.Infof("Transaction %d timed out, will retry (attempt %d/%d)", transaction.ID, transaction.RetryCount+1, transaction.MaxRetries)
 
 	return nil
 }

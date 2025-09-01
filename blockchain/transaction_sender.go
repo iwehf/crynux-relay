@@ -3,6 +3,7 @@ package blockchain
 import (
 	"context"
 	"crynux_relay/models"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -164,7 +165,7 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 	}
 
 	// Update transaction status to sent
-	if err := transaction.UpdateTransactionStatus(ctx, ts.db, models.TransactionStatusSent, txHash, ""); err != nil {
+	if err := transaction.MarkSent(ctx, ts.db, txHash); err != nil {
 		return err
 	}
 
@@ -177,6 +178,10 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 	client, err := GetBlockchainClient(transaction.Network)
 	if err != nil {
 		return "", err
+	}
+
+	if transaction.FromAddress != client.Address {
+		return "", fmt.Errorf("from address is not the same as the client address")
 	}
 
 	auth, err := client.GetAuth(ctx)

@@ -220,6 +220,7 @@ func QueueCreateCredits(ctx context.Context, db *gorm.DB, addr common.Address, a
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
@@ -259,6 +260,7 @@ func QueueSetStakingAddressForCredits(ctx context.Context, db *gorm.DB, stakingA
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
@@ -298,6 +300,7 @@ func QueueSetAdminAddressForCredits(ctx context.Context, db *gorm.DB, adminAddre
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {

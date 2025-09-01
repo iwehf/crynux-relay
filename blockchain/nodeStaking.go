@@ -159,6 +159,7 @@ func QueueStake(ctx context.Context, db *gorm.DB, stakedAmount *big.Int, network
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
@@ -236,6 +237,7 @@ func QueueUnstake(ctx context.Context, db *gorm.DB, nodeAddress common.Address, 
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
@@ -313,6 +315,7 @@ func QueueSetAdminAddressForNodeStaking(ctx context.Context, db *gorm.DB, adminA
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
@@ -389,6 +392,7 @@ func QueueSlashStaking(ctx context.Context, db *gorm.DB, nodeAddress common.Addr
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {

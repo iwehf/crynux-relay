@@ -45,11 +45,12 @@ type BlockchainClient struct {
 
 var blockchainClients = make(map[string]*BlockchainClient)
 var pattern *regexp.Regexp = regexp.MustCompile(`[Nn]once`)
+var ErrBlockchainNotFound = errors.New("blockchain not found")
 
 func GetBlockchainClient(network string) (*BlockchainClient, error) {
 	client, exists := blockchainClients[network]
 	if !exists {
-		return nil, errors.New("blockchain client not found")
+		return nil, ErrBlockchainNotFound
 	}
 	return client, nil
 }
@@ -58,7 +59,7 @@ func initBlockchainClient(ctx context.Context, network string) error {
 	appConfig := config.GetConfig()
 	blockchain, exists := appConfig.Blockchains[network]
 	if !exists {
-		return errors.New("blockchain not found")
+		return ErrBlockchainNotFound
 	}
 
 	client, err := ethclient.Dial(blockchain.RpcEndpoint)
@@ -283,14 +284,21 @@ func (client *BlockchainClient) SendETH(ctx context.Context, to common.Address, 
 }
 
 // QueueSendETH queues a send ETH transaction to be sent later
-func QueueSendETH(ctx context.Context, db *gorm.DB, from common.Address, to common.Address, amount *big.Int, network string) (*models.BlockchainTransaction, error) {
+func QueueSendETH(ctx context.Context, db *gorm.DB, to common.Address, amount *big.Int, network string) (*models.BlockchainTransaction, error) {
+	appConfig := config.GetConfig()
+	blockchain, ok := appConfig.Blockchains[network]
+	if !ok {
+		return nil, ErrBlockchainNotFound
+	}
+
 	transaction := &models.BlockchainTransaction{
 		Network:     network,
 		Type:        "SendETH",
 		Status:      models.TransactionStatusPending,
-		FromAddress: from.Hex(),
+		FromAddress: blockchain.Account.Address,
 		ToAddress:   to.Hex(),
 		Value:       amount.String(),
+		MaxRetries:  blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {

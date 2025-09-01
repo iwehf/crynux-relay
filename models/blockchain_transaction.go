@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"gorm.io/gorm"
 )
 
@@ -116,58 +115,38 @@ func GetTransactionByID(ctx context.Context, db *gorm.DB, id uint) (*BlockchainT
 	return &transaction, nil
 }
 
-func makeTxStatusUpdates(status TransactionStatus, txHash string, statusMessage string) map[string]interface{} {
+
+func (tx *BlockchainTransaction) MarkSent(ctx context.Context, db *gorm.DB, txHash string) error {
 	updates := map[string]interface{}{
-		"status": status,
+		"status": TransactionStatusSent,
+		"tx_hash": txHash,
+		"sent_at": time.Now(),
 	}
-
-	if txHash != "" {
-		updates["tx_hash"] = txHash
-		updates["sent_at"] = time.Now()
-	}
-
-	if statusMessage != "" {
-		updates["status_message"] = statusMessage
-	}
-
-	switch status {
-	case TransactionStatusSent:
-		updates["sent_at"] = time.Now()
-	case TransactionStatusConfirmed:
-		updates["confirmed_at"] = time.Now()
-	case TransactionStatusFailed:
-		updates["failed_at"] = time.Now()
-		updates["retry_count"] = gorm.Expr("retry_count + 1")
-		updates["last_retry_at"] = time.Now()
-
-		nextRetry := time.Now().Add(10 * time.Second)
-		updates["next_retry_at"] = nextRetry
-	}
-	return updates
-}
-
-func (tx *BlockchainTransaction) UpdateTransactionStatus(ctx context.Context, db *gorm.DB, status TransactionStatus, txHash string, statusMessage string) error {
-	updates := makeTxStatusUpdates(status, txHash, statusMessage)
 
 	return tx.Update(ctx, db, updates)
 }
 
-func (tx *BlockchainTransaction) UpdateTransactionReceipt(ctx context.Context, db *gorm.DB, receipt *types.Receipt, errorMsg string) error {
-	var status TransactionStatus
-	if receipt.Status == types.ReceiptStatusSuccessful {
-		status = TransactionStatusConfirmed
-	} else {
-		if tx.MaxRetries == 0 || tx.RetryCount < tx.MaxRetries {
-			status = TransactionStatusPending
-		} else {
-			status = TransactionStatusFailed
-		}
+func (tx *BlockchainTransaction) MarkConfirmed(ctx context.Context, db *gorm.DB, blockNumber, gasUsed int64, effectiveGasPrice string) error {
+	updates := map[string]interface{}{
+		"status": TransactionStatusConfirmed,
+		"confirmed_at": time.Now(),
+		"block_number": blockNumber,
+		"gas_used": gasUsed,
+		"effective_gas_price": effectiveGasPrice,
 	}
 
-	updates := makeTxStatusUpdates(status, "", errorMsg)
-	updates["block_number"] = receipt.BlockNumber.Int64()
-	updates["gas_used"] = receipt.GasUsed
-	updates["effective_gas_price"] = receipt.EffectiveGasPrice.String()
+	return tx.Update(ctx, db, updates)
+}
+
+func (tx *BlockchainTransaction) MarkFailed(ctx context.Context, db *gorm.DB, blockNumber, gasUsed int64, effectiveGasPrice string, errorMsg string) error {
+	updates := map[string]interface{}{
+		"status": TransactionStatusFailed,
+		"failed_at": time.Now(),
+		"block_number": blockNumber,
+		"gas_used": gasUsed,
+		"effective_gas_price": effectiveGasPrice,
+		"error_message": errorMsg,
+	}
 
 	return tx.Update(ctx, db, updates)
 }

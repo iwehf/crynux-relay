@@ -101,6 +101,7 @@ func QueueSetBenefitAddress(ctx context.Context, db *gorm.DB, benefitAddress com
 			String: dataStr,
 			Valid:  true,
 		},
+		MaxRetries: blockchain.MaxRetries,
 	}
 
 	if err := transaction.Save(ctx, db); err != nil {
