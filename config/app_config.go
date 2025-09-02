@@ -81,4 +81,8 @@ type AppConfig struct {
 	Wallet struct {
 		Address string `mapstructure:"address"`
 	} `mapstructure:"wallet"`
+
+	Credits struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"credits"`
 }
