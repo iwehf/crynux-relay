@@ -32,13 +32,19 @@ type AppConfig struct {
 	Http struct {
 		Host string `mapstructure:"host"`
 		Port string `mapstructure:"port"`
+
+		JWT struct {
+			SecretKey string `mapstructure:"secret_key"`
+			SecretKeyFile string `mapstructure:"secret_key_file"`
+			ExpiresIn uint64 `mapstructure:"expires_in"`
+		} `mapstructure:"jwt"`
 	} `mapstructure:"http"`
 
 	DataDir struct {
 		InferenceTasks string `mapstructure:"inference_tasks"`
 	} `mapstructure:"data_dir"`
 
-	Blockchain struct {
+	Blockchains map[string]struct {
 		RPS           uint64 `mapstructure:"rps"`
 		RpcEndpoint   string `mapstructure:"rpc_endpoint"`
 		StartBlockNum uint64 `mapstructure:"start_block_num"`
@@ -52,12 +58,14 @@ type AppConfig struct {
 			GenesisTokenAmount uint64 `mapstructure:"genesis_token_amount" description:"genesis token amount, in ether unit"`
 		} `mapstructure:"account"`
 		Contracts struct {
-			Netstats string `mapstructure:"netstats"`
-			Task     string `mapstructure:"task"`
-			Node     string `mapstructure:"node"`
-			QoS      string `mapstructure:"qos"`
+			BenefitAddress string `mapstructure:"benefit_address"`
+			NodeStaking    string `mapstructure:"node_staking"`
+			Credits        string `mapstructure:"credits"`
 		} `mapstructure:"contracts"`
-	} `mapstructure:"blockchain"`
+		MaxRetries uint8 `mapstructure:"max_retries"`
+		RetryInterval uint64 `mapstructure:"retry_interval"`
+		ReceiptWaitTime uint64 `mapstructure:"receipt_wait_time"`
+	} `mapstructure:"blockchains"`
 
 	Task struct {
 		StakeAmount       uint64 `mapstructure:"stake_amount" description:"stake amount, in ether unit"`
@@ -69,4 +77,12 @@ type AppConfig struct {
 		GPTInference                string `mapstructure:"gpt_inference"`
 		StableDiffusionFinetuneLora string `mapstructure:"stable_diffusion_finetune_lora"`
 	} `mapstructure:"task_schema"`
+
+	Wallet struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"wallet"`
+
+	Credits struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"credits"`
 }

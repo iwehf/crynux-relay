@@ -39,18 +39,26 @@ func main() {
 	if err := blockchain.Init(context.Background()); err != nil {
 		log.Fatalln(err)
 	}
-	if err := service.CreateGenesisAccount(context.Background(), config.GetDB()); err != nil {
+	if err := service.InitTaskFeeCache(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
-
-	if err := service.InitBalanceCache(context.Background(), config.GetDB()); err != nil {
+	if err := service.InitTaskQuotaCache(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
 	if err := service.InitSelectingProb(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
+	
+	tm := blockchain.NewTransactionManager(config.GetDB())
+	tm.Start(context.Background())
+	
+	stakingUpdater := service.NewStakeAmountUpdater(config.GetDB())
+	stakingUpdater.Start(context.Background())
+	
+	service.StartNativeTokenListener(context.Background())
 	go service.StartTaskProcesser(context.Background())
-	go service.StartBalanceSync(context.Background(), config.GetDB())
+	go service.StartTaskQuotaSync(context.Background(), config.GetDB())
+	go service.StartTaskFeeSync(context.Background(), config.GetDB())
 	// go tasks.ProcessTasks(context.Background())
 	go tasks.StartSyncNetwork(context.Background())
 	go tasks.StartStatsTaskCount(context.Background())

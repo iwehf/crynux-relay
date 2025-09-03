@@ -90,14 +90,6 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 	appConfig := config.GetConfig()
 	stakeAmount := utils.EtherToWei(big.NewInt(int64(appConfig.Task.StakeAmount)))
 
-	balance, err := service.GetBalance(c.Request.Context(), config.GetDB(), in.Address)
-	if err != nil {
-		return nil, response.NewExceptionResponse(err)
-	}
-	if balance.Cmp(stakeAmount) < 0 {
-		return nil, response.NewValidationErrorResponse("balance", "Insufficient balance")
-	}
-
 	node.StakeAmount = models.BigInt{Int: *stakeAmount}
 
 	if err := service.SetNodeStatusJoin(c.Request.Context(), config.GetDB(), node, in.ModelIDs); err != nil {

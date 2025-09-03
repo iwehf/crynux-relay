@@ -32,6 +32,69 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "fromAddr",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "toAddr",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "CreditsBought",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "CreditsStaked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "CreditsUnstaked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "previousOwner",
         "type": "address"
       },
@@ -49,123 +112,28 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "nodeAddress",
+        "name": "addr",
         "type": "address"
       },
       {
         "internalType": "uint256",
-        "name": "i",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "addTaskScore",
+    "name": "createCredits",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "finishTask",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getCurrentTaskScore",
+    "inputs": [],
+    "name": "getAllCreditAddresses",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "address[]",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getRecentTaskCount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getRecentTaskScore",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getTaskCount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getTaskScore",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "type": "address[]"
       }
     ],
     "stateMutability": "view",
@@ -173,12 +141,17 @@
   },
   {
     "inputs": [],
-    "name": "getTaskScoreLimit",
+    "name": "getAllCredits",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "address[]",
         "name": "",
-        "type": "uint256"
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -188,13 +161,19 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "nodeAddress",
+        "name": "addr",
         "type": "address"
       }
     ],
-    "name": "kickout",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "getCredits",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -211,19 +190,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeAddress",
-        "type": "address"
-      }
-    ],
-    "name": "punish",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
@@ -234,30 +200,42 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "nodeAddress",
+        "name": "addr",
         "type": "address"
       }
     ],
-    "name": "shouldKickOut",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
+    "name": "setAdminAddress",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
       {
         "internalType": "address",
-        "name": "nodeAddress",
+        "name": "addr",
         "type": "address"
       }
     ],
-    "name": "startTask",
+    "name": "setStakingAddress",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "stakeCredits",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -278,38 +256,17 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "addr",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
-        "name": "threshold",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "updateKickoutThreshold",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "nodeContract",
-        "type": "address"
-      }
-    ],
-    "name": "updateNodeContractAddress",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "taskContract",
-        "type": "address"
-      }
-    ],
-    "name": "updateTaskContractAddress",
+    "name": "unstakeCredits",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
