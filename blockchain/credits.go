@@ -92,9 +92,6 @@ func CreateCredits(ctx context.Context, addr common.Address, amount *big.Int, ne
 		return "", err
 	}
 
-	// Set the value to the amount being purchased (payable function)
-	auth.Value = amount
-
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := client.Limiter.Wait(callCtx); err != nil {
@@ -215,7 +212,6 @@ func QueueCreateCredits(ctx context.Context, db *gorm.DB, addr common.Address, a
 		Status:      models.TransactionStatusPending,
 		FromAddress: blockchain.Account.Address,
 		ToAddress:   blockchain.Contracts.Credits,
-		Value:       amount.String(),
 		Data: sql.NullString{
 			String: dataStr,
 			Valid:  true,
