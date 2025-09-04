@@ -52,7 +52,7 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 	return record, nil
 }
 
-func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
+func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint, txHash string) error {
 
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -75,7 +75,11 @@ func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return ErrWithdrawRequestNotPending
 		}
 
-		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusSuccess).Error; err != nil {
+		updates := map[string]interface{}{
+			"status": models.WithdrawStatusSuccess,
+			"tx_hash": txHash,
+		}
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Updates(updates).Error; err != nil {
 			return err
 		}
 

@@ -26,6 +26,7 @@ type WithdrawRecord struct {
 	Amount         string                `json:"amount"`
 	Network        string                `json:"network"`
 	Status         models.WithdrawStatus `json:"status"`
+	TxHash         string                `json:"tx_hash"`
 }
 
 type GetWithdrawRecordsData struct {
@@ -80,6 +81,10 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 
 	results := make([]WithdrawRecord, len(withdrawRecords))
 	for i, record := range withdrawRecords {
+		var txHash string
+		if record.TxHash.Valid {
+			txHash = record.TxHash.String
+		}
 		results[i] = WithdrawRecord{
 			ID:             record.ID,
 			Address:        record.Address,
@@ -87,6 +92,7 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 			Amount:         record.Amount.String(),
 			Network:        record.Network,
 			Status:         record.Status,
+			TxHash:         txHash,
 		}
 	}
 
