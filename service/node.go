@@ -166,6 +166,10 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	if !(node.Status == models.NodeStatusBusy || node.Status == models.NodeStatusPendingPause || node.Status == models.NodeStatusPendingQuit) {
 		return errors.New("illegal node status")
 	}
+	if !node.CurrentTaskIDCommitment.Valid {
+		return errors.New("task id commitment is not valid")
+	}
+	taskIDCommitment := node.CurrentTaskIDCommitment.String
 	kickout, err := shouldKickoutNode(ctx, node)
 	if err != nil {
 		return err
@@ -175,7 +179,7 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 			if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
 				return err
 			}
-			return emitEvent(ctx, db, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: node.CurrentTaskIDCommitment.String})
+			return emitEvent(ctx, db, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
 		})
 	}
 
@@ -200,11 +204,15 @@ func nodeSlash(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	if !(node.Status == models.NodeStatusBusy || node.Status == models.NodeStatusPendingPause || node.Status == models.NodeStatusPendingQuit) {
 		return errors.New("illegal node status")
 	}
+	if !node.CurrentTaskIDCommitment.Valid {
+		return errors.New("task id commitment is not valid")
+	}
+	taskIDCommitment := node.CurrentTaskIDCommitment.String
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := SetNodeStatusQuit(ctx, db, node, true); err != nil {
 			return err
 		}
-		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: node.CurrentTaskIDCommitment.String})
+		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
 	})
 }
 
