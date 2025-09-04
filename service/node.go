@@ -24,7 +24,7 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 		return errors.New("staking amount mismatch")
 	}
 
-	return db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		node.Status = models.NodeStatusAvailable
 		node.JoinTime = time.Now()
 		if err := node.Save(ctx, tx); err != nil {
@@ -51,9 +51,19 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 		}).Create(&networkNodeData).Error; err != nil {
 			return err
 		}
-		UpdateMaxStaking(&node.StakeAmount.Int)
+		if err := emitEvent(ctx, tx, &models.NodeJoinEvent{NodeAddress: node.Address}); err != nil {
+			return err
+		}
+		if err := emitEvent(ctx, tx, &models.NodeStakingEvent{NodeAddress: node.Address, StakingAmount: node.StakeAmount}); err != nil {
+			return err
+		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	UpdateMaxStaking(&node.StakeAmount.Int)
+	return nil
 }
 
 func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slashed bool) error {
@@ -66,7 +76,6 @@ func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slas
 
 		if err := node.Update(ctx, tx, map[string]interface{}{
 			"status":                     models.NodeStatusQuit,
-			"qos_score":                  0,
 			"current_task_id_commitment": sql.NullString{Valid: false},
 			"stake_amount":               models.BigInt{Int: *big.NewInt(0)},
 		}); err != nil {
@@ -75,14 +84,20 @@ func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slas
 		if err := RefreshMaxStaking(ctx, tx); err != nil {
 			return err
 		}
+		var blockchainTransaction *models.BlockchainTransaction
 		if slashed {
-			if _, err := blockchain.QueueSlashStaking(ctx, tx, common.HexToAddress(node.Address), node.Network); err != nil {
+			blockchainTransaction, err = blockchain.QueueSlashStaking(ctx, tx, common.HexToAddress(node.Address), node.Network)
+			if err != nil {
 				return err
 			}
 		} else {
-			if _, err := blockchain.QueueUnstake(ctx, tx, common.HexToAddress(node.Address), node.Network); err != nil {
+			blockchainTransaction, err = blockchain.QueueUnstake(ctx, tx, common.HexToAddress(node.Address), node.Network)
+			if err != nil {
 				return err
 			}
+		}
+		if err := emitEvent(ctx, tx, &models.NodeQuitEvent{NodeAddress: node.Address, BlockchainTransactionID: blockchainTransaction.ID}); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -160,7 +175,7 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 			if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
 				return err
 			}
-			return emitEvent(ctx, db, &models.NodeKickedOutEvent{NodeAddress: node.Address})
+			return emitEvent(ctx, db, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: node.CurrentTaskIDCommitment.String})
 		})
 	}
 
@@ -189,7 +204,7 @@ func nodeSlash(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		if err := SetNodeStatusQuit(ctx, db, node, true); err != nil {
 			return err
 		}
-		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address})
+		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: node.CurrentTaskIDCommitment.String})
 	})
 }
 

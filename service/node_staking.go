@@ -182,15 +182,25 @@ func (updater *StakeAmountUpdater) updateNodeStakeAmount(ctx context.Context, no
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
-	if err := updater.db.WithContext(dbCtx).
-		Model(node).
-		Update("stake_amount", models.BigInt{Int: *totalStakeAmount}).Error; err != nil {
+	if err := updater.db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(node).Update("stake_amount", models.BigInt{Int: *totalStakeAmount}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.NetworkNodeData{}).Where("address = ?", node.Address).Update("staking", models.BigInt{Int: *totalStakeAmount}).Error; err != nil {
+			return err
+		}
+		if err := emitEvent(ctx, tx, &models.NodeStakingEvent{NodeAddress: node.Address, StakingAmount: models.BigInt{Int: *totalStakeAmount}}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		log.Errorf("StakeAmountUpdater: failed to update database for node %s: %v", node.Address, err)
 		return err
 	}
 
 	// Update value in memory
 	node.StakeAmount = models.BigInt{Int: *totalStakeAmount}
+	UpdateMaxStaking(totalStakeAmount)
 
 	log.Infof("StakeAmountUpdater: successfully updated node %s stake amount to %s",
 		node.Address, totalStakeAmount.String())
