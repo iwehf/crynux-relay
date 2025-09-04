@@ -215,7 +215,8 @@ func (e *TaskEndGroupSuccessEvent) ToEvent() (*Event, error) {
 }
 
 type NodeKickedOutEvent struct {
-	NodeAddress string `json:"node_address"`
+	NodeAddress      string `json:"node_address"`
+	TaskIDCommitment string `json:"task_id_commitment"`
 }
 
 func (e *NodeKickedOutEvent) ToEvent() (*Event, error) {
@@ -224,14 +225,16 @@ func (e *NodeKickedOutEvent) ToEvent() (*Event, error) {
 		return nil, err
 	}
 	return &Event{
-		Type:        "NodeKickedOut",
-		NodeAddress: e.NodeAddress,
-		Args:        string(bs),
+		Type:             "NodeKickedOut",
+		NodeAddress:      e.NodeAddress,
+		TaskIDCommitment: e.TaskIDCommitment,
+		Args:             string(bs),
 	}, nil
 }
 
 type NodeSlashedEvent struct {
-	NodeAddress string `json:"node_address"`
+	NodeAddress      string `json:"node_address"`
+	TaskIDCommitment string `json:"task_id_commitment"`
 }
 
 func (e *NodeSlashedEvent) ToEvent() (*Event, error) {
@@ -240,7 +243,58 @@ func (e *NodeSlashedEvent) ToEvent() (*Event, error) {
 		return nil, err
 	}
 	return &Event{
-		Type:        "NodeSlashed",
+		Type:             "NodeSlashed",
+		NodeAddress:      e.NodeAddress,
+		TaskIDCommitment: e.TaskIDCommitment,
+		Args:             string(bs),
+	}, nil
+}
+
+type NodeJoinEvent struct {
+	NodeAddress string `json:"node_address"`
+}
+
+func (e *NodeJoinEvent) ToEvent() (*Event, error) {
+	bs, err := json.Marshal(e)
+	if err != nil {
+		return nil, err
+	}
+	return &Event{
+		Type:        "NodeJoin",
+		NodeAddress: e.NodeAddress,
+		Args:        string(bs),
+	}, nil
+}
+
+type NodeQuitEvent struct {
+	NodeAddress string `json:"node_address"`
+	BlockchainTransactionID uint `json:"blockchain_transaction_id"`
+}
+
+func (e *NodeQuitEvent) ToEvent() (*Event, error) {
+	bs, err := json.Marshal(e)
+	if err != nil {
+		return nil, err
+	}
+	return &Event{
+		Type:        "NodeQuit",
+		NodeAddress: e.NodeAddress,
+		Args:        string(bs),
+	}, nil
+}
+
+type NodeStakingEvent struct {
+	NodeAddress   string `json:"node_address"`
+	StakingAmount BigInt `json:"staking_amount"`
+}
+
+func (e *NodeStakingEvent) ToEvent() (*Event, error) {
+	bs, err := json.Marshal(e)
+	if err != nil {
+		return nil, err
+	}
+	return &Event{
+		Type:        "NodeStaking",
 		NodeAddress: e.NodeAddress,
 		Args:        string(bs),
 	}, nil
