@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"database/sql"
+
+	"gorm.io/gorm"
+)
 
 type WithdrawRecord struct {
 	gorm.Model
@@ -11,6 +15,7 @@ type WithdrawRecord struct {
 	Status         WithdrawStatus      `json:"status" gorm:"not null;default:0;index"`
 	LocalStatus    WithdrawLocalStatus `json:"local_status" gorm:"not null;default:0;index"`
 	TaskFeeEventID uint                `json:"task_fee_event_id" gorm:"not null"`
+	TxHash         sql.NullString      `json:"tx_hash" gorm:"null;"`
 }
 
 type WithdrawStatus int8

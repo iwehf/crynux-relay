@@ -62,7 +62,11 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 		log.Errorf("Error getting benefit address: %v", err)
 		return nil, response.NewExceptionResponse(err)
 	}
-	if ba.Hex() != in.BenefitAddress {
+	var benefitAddress string
+	if ba.Hex() != "0x0000000000000000000000000000000000000000" {
+		benefitAddress = ba.Hex()
+	}
+	if benefitAddress != in.BenefitAddress {
 		validationErr := response.NewValidationErrorResponse("benefit_address", "Benefit address mismatch")
 		return nil, validationErr
 	}
