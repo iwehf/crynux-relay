@@ -16,12 +16,12 @@ import (
 )
 
 type CreateWithdrawInput struct {
-	Address        string `path:"address" json:"address" form:"address" validate:"required" description:"The address of the user"`
-	Amount         string `json:"amount" form:"amount" validate:"required" description:"The amount of the withdraw"`
-	BenefitAddress string `json:"benefit_address" form:"benefit_address" validate:"required" description:"The address of the benefit"`
-	Network        string `json:"network" form:"network" validate:"required" description:"The network of the withdraw"`
-	Timestamp      int64  `json:"timestamp" form:"timestamp" validate:"required" description:"The timestamp of the withdraw"`
-	Signature      string `json:"signature" form:"signature" validate:"required" description:"The signature of the withdraw"`
+	Address        string  `path:"address" json:"address" form:"address" validate:"required" description:"The address of the user"`
+	Amount         string  `json:"amount" form:"amount" validate:"required" description:"The amount of the withdraw"`
+	BenefitAddress *string `json:"benefit_address" form:"benefit_address" validate:"required" description:"The address of the benefit"`
+	Network        string  `json:"network" form:"network" validate:"required" description:"The network of the withdraw"`
+	Timestamp      int64   `json:"timestamp" form:"timestamp" validate:"required" description:"The timestamp of the withdraw"`
+	Signature      string  `json:"signature" form:"signature" validate:"required" description:"The signature of the withdraw"`
 }
 
 type CreateWithdrawData struct {
@@ -41,7 +41,7 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 	}
 	// Generate the correct signature message format
 	amount, _ := big.NewInt(0).SetString(in.Amount, 10)
-	message := tools.GenerateWithdrawMessage(in.Address, amount, in.BenefitAddress, in.Network, in.Timestamp)
+	message := tools.GenerateWithdrawMessage(in.Address, amount, *in.BenefitAddress, in.Network, in.Timestamp)
 
 	// Recover address from signature using the proper signature validation tools
 	signerAddress, err := tools.ValidateAndRecover(message, in.Signature, in.Timestamp)
@@ -66,12 +66,12 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 	if ba.Hex() != "0x0000000000000000000000000000000000000000" {
 		benefitAddress = ba.Hex()
 	}
-	if benefitAddress != in.BenefitAddress {
+	if benefitAddress != *in.BenefitAddress {
 		validationErr := response.NewValidationErrorResponse("benefit_address", "Benefit address mismatch")
 		return nil, validationErr
 	}
 
-	record, err := service.Withdraw(c.Request.Context(), config.GetDB(), in.Address, in.BenefitAddress, amount, in.Network)
+	record, err := service.Withdraw(c.Request.Context(), config.GetDB(), in.Address, *in.BenefitAddress, amount, in.Network)
 	if err != nil {
 		log.Errorf("Error creating withdraw record: %v", err)
 		return nil, response.NewExceptionResponse(err)
