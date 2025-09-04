@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type GetNodeIncentiveParams struct {
+type GetNodeIncentiveRankParams struct {
 	Period TimeUnit `query:"period" validate:"required" enum:"Day,Week,Month"`
 	Size   int      `query:"size" default:"30"`
 }
@@ -26,11 +26,11 @@ type GetNodeIncentiveData struct {
 	Nodes []NodeIncentive `json:"nodes"`
 }
 
-type GetNodeIncentiveOutput struct {
+type GetNodeIncentiveRankOutput struct {
 	Data *GetNodeIncentiveData `json:"data"`
 }
 
-func GetNodeIncentive(_ *gin.Context, input *GetNodeIncentiveParams) (*GetNodeIncentiveOutput, error) {
+func GetNodeIncentiveRank(_ *gin.Context, input *GetNodeIncentiveRankParams) (*GetNodeIncentiveRankOutput, error) {
 	size := input.Size
 	if size == 0 {
 		size = 30
@@ -107,7 +107,7 @@ func GetNodeIncentive(_ *gin.Context, input *GetNodeIncentiveParams) (*GetNodeIn
 		}
 	}
 
-	return &GetNodeIncentiveOutput{
+	return &GetNodeIncentiveRankOutput{
 		Data: &GetNodeIncentiveData{
 			Nodes: nodeIncentives,
 		},

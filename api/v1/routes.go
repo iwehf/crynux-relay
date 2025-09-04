@@ -228,7 +228,11 @@ func InitRoutes(r *fizz.Fizz) {
 	incentiveGroup.GET("/nodes", []fizz.OperationOption{
 		fizz.Summary("Get nodes with top K incentive"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(incentive.GetNodeIncentive, 200))
+	}, tonic.Handler(incentive.GetNodeIncentiveRank, 200))
+	incentiveGroup.GET("/node/:address", []fizz.OperationOption{
+		fizz.Summary("Get node daily incentive"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(incentive.GetNodeDailyIncentive, 200))
 
 	taskFeeGroup := v1g.Group("task_fee", "task_fee", "task fee related APIs")
 	taskFeeGroup.GET("/logs", []fizz.OperationOption{
