@@ -10,6 +10,7 @@ type WithdrawRecord struct {
 	Network        string              `json:"network" gorm:"not null;index"`
 	Status         WithdrawStatus      `json:"status" gorm:"not null;default:0;index"`
 	LocalStatus    WithdrawLocalStatus `json:"local_status" gorm:"not null;default:0;index"`
+	TaskFeeEventID uint                `json:"task_fee_event_id" gorm:"not null"`
 }
 
 type WithdrawStatus int8
