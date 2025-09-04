@@ -32,6 +32,12 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 			return err
 		}
 
+		var taskFeeEvent models.TaskFeeEvent
+		if err := tx.Model(&models.TaskFeeEvent{}).Where("address = ?", address).Last(&taskFeeEvent).Error; err != nil {
+			return err
+		}
+		record.TaskFeeEventID = taskFeeEvent.ID
+
 		if err := tx.Create(record).Error; err != nil {
 			return err
 		}

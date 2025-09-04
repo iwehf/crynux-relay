@@ -30,6 +30,7 @@ type WithdrawRecord struct {
 	Amount         string                `json:"amount"`
 	Network        string                `json:"network"`
 	Status         models.WithdrawStatus `json:"status"`
+	TaskFeeEventID uint                  `json:"task_fee_event_id"`
 }
 
 type GetWithdrawRequestsResponse struct {
@@ -78,6 +79,7 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 					Amount:         record.Amount.String(),
 					Network:        record.Network,
 					Status:         record.Status,
+					TaskFeeEventID: record.TaskFeeEventID,
 				})
 			}
 		}
