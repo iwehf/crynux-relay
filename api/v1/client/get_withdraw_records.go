@@ -28,6 +28,7 @@ type WithdrawRecord struct {
 	Network        string                `json:"network"`
 	Status         models.WithdrawStatus `json:"status"`
 	TxHash         string                `json:"tx_hash"`
+	WithdrawalFee  string                `json:"withdrawal_fee"`
 }
 
 type GetWithdrawRecordsData struct {
@@ -95,6 +96,7 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 			Network:        record.Network,
 			Status:         record.Status,
 			TxHash:         txHash,
+			WithdrawalFee:  record.WithdrawalFee.String(),
 		}
 	}
 
