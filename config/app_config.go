@@ -34,9 +34,9 @@ type AppConfig struct {
 		Port string `mapstructure:"port"`
 
 		JWT struct {
-			SecretKey string `mapstructure:"secret_key"`
+			SecretKey     string `mapstructure:"secret_key"`
 			SecretKeyFile string `mapstructure:"secret_key_file"`
-			ExpiresIn uint64 `mapstructure:"expires_in"`
+			ExpiresIn     uint64 `mapstructure:"expires_in"`
 		} `mapstructure:"jwt"`
 	} `mapstructure:"http"`
 
@@ -62,8 +62,8 @@ type AppConfig struct {
 			NodeStaking    string `mapstructure:"node_staking"`
 			Credits        string `mapstructure:"credits"`
 		} `mapstructure:"contracts"`
-		MaxRetries uint8 `mapstructure:"max_retries"`
-		RetryInterval uint64 `mapstructure:"retry_interval"`
+		MaxRetries      uint8  `mapstructure:"max_retries"`
+		RetryInterval   uint64 `mapstructure:"retry_interval"`
 		ReceiptWaitTime uint64 `mapstructure:"receipt_wait_time"`
 	} `mapstructure:"blockchains"`
 
@@ -78,9 +78,10 @@ type AppConfig struct {
 		StableDiffusionFinetuneLora string `mapstructure:"stable_diffusion_finetune_lora"`
 	} `mapstructure:"task_schema"`
 
-	Wallet struct {
-		Address string `mapstructure:"address"`
-	} `mapstructure:"wallet"`
+	Withdraw struct {
+		Address       string `mapstructure:"address"`
+		WithdrawalFee uint64 `mapstructure:"withdrawal_fee"`
+	} `mapstructure:"withdraw"`
 
 	Credits struct {
 		Address string `mapstructure:"address"`

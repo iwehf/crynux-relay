@@ -42,7 +42,7 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Wallet.Address {
+	if address != config.GetConfig().Withdraw.Address {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}
