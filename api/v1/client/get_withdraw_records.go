@@ -21,6 +21,7 @@ type GetWithdrawRecordsInput struct {
 
 type WithdrawRecord struct {
 	ID             uint                  `json:"id"`
+	CreatedAt      uint64                `json:"created_at"`
 	Address        string                `json:"address"`
 	BenefitAddress string                `json:"benefit_address"`
 	Amount         string                `json:"amount"`
@@ -87,6 +88,7 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 		}
 		results[i] = WithdrawRecord{
 			ID:             record.ID,
+			CreatedAt:      uint64(record.CreatedAt.Unix()),
 			Address:        record.Address,
 			BenefitAddress: record.BenefitAddress,
 			Amount:         record.Amount.String(),
