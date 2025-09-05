@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"crynux_relay/models"
-	"crynux_relay/utils"
 	"database/sql"
 	"errors"
 	"math/big"
@@ -443,18 +442,11 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var commitFuncs []func() error
 		for _, payment := range payments {
-			commitFunc, err := sendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment)
+			commitFunc, err := sendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment, task.TaskType)
 			if err != nil {
 				return err
 			}
 			commitFuncs = append(commitFuncs, commitFunc)
-		}
-
-		for _, payment := range payments {
-			incentive, _ := utils.WeiToEther(payment.payment).Float64()
-			if err := addNodeIncentive(ctx, tx, payment.address, incentive, task.TaskType); err != nil {
-				return err
-			}
 		}
 
 		err = task.Update(ctx, tx, map[string]interface{}{

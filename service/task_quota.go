@@ -61,30 +61,37 @@ func getPendingTaskQuotaEvents(ctx context.Context, db *gorm.DB, limit int) ([]m
 }
 
 func validatePendingTaskQuotaEvents(ctx context.Context, db *gorm.DB, events []models.TaskQuotaEvent) ([]models.TaskQuotaEvent, []models.TaskQuotaEvent, error) {
+	invalidEvents := make([]models.TaskQuotaEvent, 0)
+	candidateEvents := make([]models.TaskQuotaEvent, 0)
+
 	var taskIDCommitments []string
+	taskIDCommitmentMap := make(map[string]struct{})
 	var txHashes []string
 	var networks []string
-	taskQuotaEventMap := make(map[string]models.TaskQuotaEvent)
 	for _, event := range events {
 		reasons := strings.Split(event.Reason, "-")
-		if len(reasons) !=2 && len(reasons) != 3 {
+		if len(reasons) != 2 && len(reasons) != 3 {
+			invalidEvents = append(invalidEvents, event)
 			continue
 		}
 		eventType := reasons[0]
 		if eventType != fmt.Sprintf("%d", event.TaskQuotaType) {
+			invalidEvents = append(invalidEvents, event)
 			continue
 		}
 		if event.TaskQuotaType == models.TaskQuotaTypeSpent || event.TaskQuotaType == models.TaskQuotaTypeRefunded {
 			taskIDCommitment := reasons[1]
-			taskIDCommitments = append(taskIDCommitments, taskIDCommitment)
-			taskQuotaEventMap[taskIDCommitment] = event
+			if _, ok := taskIDCommitmentMap[taskIDCommitment]; !ok {
+				taskIDCommitmentMap[taskIDCommitment] = struct{}{}
+				taskIDCommitments = append(taskIDCommitments, taskIDCommitment)
+			}
 		} else {
 			txHash := reasons[1]
 			network := reasons[2]
 			txHashes = append(txHashes, txHash)
 			networks = append(networks, network)
-			taskQuotaEventMap[txHash] = event
 		}
+		candidateEvents = append(candidateEvents, event)
 	}
 
 	var tasks []models.InferenceTask
@@ -98,7 +105,7 @@ func validatePendingTaskQuotaEvents(ctx context.Context, db *gorm.DB, events []m
 		taskMap[task.TaskIDCommitment] = task
 	}
 
-	validTxHashes := make([]string, 0)
+	validTxHashesMap := make(map[string]struct{})
 	for i, txHash := range txHashes {
 		network := networks[i]
 		client, err := blockchain.GetBlockchainClient(network)
@@ -115,33 +122,32 @@ func validatePendingTaskQuotaEvents(ctx context.Context, db *gorm.DB, events []m
 		if receipt.Status != types.ReceiptStatusSuccessful {
 			continue
 		}
-		validTxHashes = append(validTxHashes, txHash)
+		validTxHashesMap[txHash] = struct{}{}
 	}
 
-	validEventIDs := make(map[uint]struct{})
 	validEvents := make([]models.TaskQuotaEvent, 0)
-	invalidEvents := make([]models.TaskQuotaEvent, 0)
-	for taskIDCommitment, task := range taskMap {
-		if event, exists := taskQuotaEventMap[taskIDCommitment]; exists {
-			if event.TaskQuotaType == models.TaskQuotaTypeSpent && event.Quota.Int.Cmp(&task.TaskFee.Int) == 0 {
-				validEventIDs[event.ID] = struct{}{}
-				validEvents = append(validEvents, event)
-			} else if event.TaskQuotaType == models.TaskQuotaTypeRefunded && event.Quota.Int.Cmp(&task.TaskFee.Int) == 0 && (task.Status == models.TaskEndGroupRefund || task.Status == models.TaskEndAborted) {
-				validEventIDs[event.ID] = struct{}{}
-				validEvents = append(validEvents, event)
+	for _, event := range candidateEvents {
+		reasons := strings.Split(event.Reason, "-")
+		if event.TaskQuotaType == models.TaskQuotaTypeSpent || event.TaskQuotaType == models.TaskQuotaTypeRefunded {
+			taskIDCommitment := reasons[1]
+			if task, exists := taskMap[taskIDCommitment]; exists {
+				if event.TaskQuotaType == models.TaskQuotaTypeSpent && event.Quota.Int.Cmp(&task.TaskFee.Int) == 0 {
+					validEvents = append(validEvents, event)
+				} else if event.TaskQuotaType == models.TaskQuotaTypeRefunded && event.Quota.Int.Cmp(&task.TaskFee.Int) == 0 && (task.Status == models.TaskEndGroupRefund || task.Status == models.TaskEndAborted) {
+					validEvents = append(validEvents, event)
+				} else {
+					invalidEvents = append(invalidEvents, event)
+				}
+			} else {
+				invalidEvents = append(invalidEvents, event)
 			}
-		}
-	}
-	for _, txHash := range validTxHashes {
-		if event, exists := taskQuotaEventMap[txHash]; exists {
-			validEventIDs[event.ID] = struct{}{}
-			validEvents = append(validEvents, event)
-		}
-	}
-
-	for _, event := range events {
-		if _, exists := validEventIDs[event.ID]; !exists {
-			invalidEvents = append(invalidEvents, event)
+		} else {
+			txHash := reasons[1]
+			if _, exists := validTxHashesMap[txHash]; exists {
+				validEvents = append(validEvents, event)
+			} else {
+				invalidEvents = append(invalidEvents, event)
+			}
 		}
 	}
 
