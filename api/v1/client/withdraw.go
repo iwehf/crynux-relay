@@ -7,6 +7,7 @@ import (
 	"crynux_relay/blockchain"
 	"crynux_relay/config"
 	"crynux_relay/service"
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -74,6 +75,10 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 	record, err := service.Withdraw(c.Request.Context(), config.GetDB(), in.Address, *in.BenefitAddress, amount, in.Network)
 	if err != nil {
 		log.Errorf("Error creating withdraw record: %v", err)
+		if errors.Is(err, service.ErrInsufficientTaskFee) {
+			validationErr := response.NewValidationErrorResponse("amount", "Insufficient task fee")
+			return nil, validationErr
+		}
 		return nil, response.NewExceptionResponse(err)
 	}
 

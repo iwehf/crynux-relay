@@ -5,6 +5,7 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/models"
 	"fmt"
+	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -13,6 +14,8 @@ import (
 
 	"gorm.io/gorm"
 )
+
+var ErrInsufficientTaskFee = errors.New("insufficient task fee")
 
 type TaskFeeCache struct {
 	taskFees map[string]*big.Int
@@ -482,14 +485,14 @@ func withdrawTaskFee(ctx context.Context, db *gorm.DB, address string, amount *b
 		return nil, err
 	}
 	if taskFee.Cmp(amount) < 0 {
-		return nil, fmt.Errorf("insufficient task fee when withdraw")
+		return nil, ErrInsufficientTaskFee
 	}
 	amountCopy := new(big.Int).Set(amount)
 	commitFunc := func() error {
 		taskFeeCache.mu.Lock()
 		defer taskFeeCache.mu.Unlock()
 		if taskFee.Cmp(amountCopy) < 0 {
-			return fmt.Errorf("insufficient task fee when withdraw")
+			return ErrInsufficientTaskFee
 		}
 		taskFee.Sub(taskFee, amountCopy)
 		return nil
