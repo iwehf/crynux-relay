@@ -514,7 +514,7 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 		TaskFee:          models.BigInt{Int: *new(big.Int).Set(daoFee)},
 		CreatedAt:        time.Now(),
 		Status:           models.TaskFeeEventStatusPending,
-		Type:             models.TaskFeeEventTypeTask,
+		Type:             models.TaskFeeEventTypeDraw,
 		Reason:           fmt.Sprintf("%d-%s", models.TaskFeeEventTypeDraw, taskIDCommitment),
 	}
 	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
