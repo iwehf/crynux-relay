@@ -12,7 +12,7 @@ import (
 )
 
 type FulfillWithdrawRequestInput struct {
-	ID uint `path:"id" json:"id" description:"Withdraw request ID"`
+	ID     uint   `path:"id" json:"id" description:"Withdraw request ID"`
 	TxHash string `form:"tx_hash" json:"tx_hash" description:"Transaction hash"`
 }
 
@@ -34,7 +34,7 @@ func FulfillWithdrawRequest(c *gin.Context, in *FulfillWithdrawRequestInputWithS
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Wallet.Address {
+	if address != config.GetConfig().Withdraw.Address {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}

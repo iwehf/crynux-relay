@@ -16,6 +16,7 @@ type WithdrawRecord struct {
 	LocalStatus    WithdrawLocalStatus `json:"local_status" gorm:"not null;default:0;index"`
 	TaskFeeEventID uint                `json:"task_fee_event_id" gorm:"not null"`
 	TxHash         sql.NullString      `json:"tx_hash" gorm:"null;"`
+	WithdrawalFee  BigInt              `json:"withdrawal_fee" gorm:"not null"`
 }
 
 type WithdrawStatus int8

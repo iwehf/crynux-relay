@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/utils"
 	"errors"
 	"math/big"
 	"time"
@@ -14,9 +16,11 @@ var ErrWithdrawRequestNotPending = errors.New("withdraw request is not pending")
 var ErrWithdrawRequestNotProcessedLocally = errors.New("withdraw request has not been processed locally")
 
 func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, amount *big.Int, network string) (*models.WithdrawRecord, error) {
+	appConfig := config.GetConfig()
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	withdrawalFee := utils.EtherToWei(big.NewInt(0).SetUint64(appConfig.Withdraw.WithdrawalFee))
 	record := &models.WithdrawRecord{
 		Address:        address,
 		BenefitAddress: benefitAddress,
@@ -24,10 +28,13 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 		Network:        network,
 		Status:         models.WithdrawStatusPending,
 		LocalStatus:    models.WithdrawLocalStatusPending,
+		WithdrawalFee:  models.BigInt{Int: *withdrawalFee},
 	}
 
+	totalAmount := big.NewInt(0).Add(amount, withdrawalFee)
+
 	if err := db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := withdrawTaskFee(ctx, tx, address, amount)
+		commitFunc, err := withdrawTaskFee(ctx, tx, address, totalAmount)
 		if err != nil {
 			return err
 		}
@@ -76,7 +83,7 @@ func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint, txHash s
 		}
 
 		updates := map[string]interface{}{
-			"status": models.WithdrawStatusSuccess,
+			"status":  models.WithdrawStatusSuccess,
 			"tx_hash": txHash,
 		}
 		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Updates(updates).Error; err != nil {
@@ -116,7 +123,9 @@ func RejectWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return err
 		}
 
-		commitFunc, err := rejectWithdrawTaskFee(ctx, tx, record.Address, &record.Amount.Int)
+		totalAmount := big.NewInt(0).Add(&record.Amount.Int, &record.WithdrawalFee.Int)
+
+		commitFunc, err := rejectWithdrawTaskFee(ctx, tx, record.Address, totalAmount)
 		if err != nil {
 			return err
 		}

@@ -32,7 +32,7 @@ func RejectWithdrawRequest(c *gin.Context, in *RejectWithdrawRequestInputWithSig
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Wallet.Address {
+	if address != config.GetConfig().Withdraw.Address {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}

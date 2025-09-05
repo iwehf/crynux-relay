@@ -21,12 +21,14 @@ type GetWithdrawRecordsInput struct {
 
 type WithdrawRecord struct {
 	ID             uint                  `json:"id"`
+	CreatedAt      uint64                `json:"created_at"`
 	Address        string                `json:"address"`
 	BenefitAddress string                `json:"benefit_address"`
 	Amount         string                `json:"amount"`
 	Network        string                `json:"network"`
 	Status         models.WithdrawStatus `json:"status"`
 	TxHash         string                `json:"tx_hash"`
+	WithdrawalFee  string                `json:"withdrawal_fee"`
 }
 
 type GetWithdrawRecordsData struct {
@@ -87,12 +89,14 @@ func GetWithdrawRecords(c *gin.Context, in *GetWithdrawRecordsInput) (*GetWithdr
 		}
 		results[i] = WithdrawRecord{
 			ID:             record.ID,
+			CreatedAt:      uint64(record.CreatedAt.Unix()),
 			Address:        record.Address,
 			BenefitAddress: record.BenefitAddress,
 			Amount:         record.Amount.String(),
 			Network:        record.Network,
 			Status:         record.Status,
 			TxHash:         txHash,
+			WithdrawalFee:  record.WithdrawalFee.String(),
 		}
 	}
 
