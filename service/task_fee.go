@@ -4,9 +4,12 @@ import (
 	"context"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"fmt"
+	"crynux_relay/utils"
 	"errors"
+	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,19 +86,51 @@ func getPendingWithdrawEvents(ctx context.Context, db *gorm.DB, limit int) ([]mo
 }
 
 func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []models.TaskFeeEvent) ([]models.TaskFeeEvent, []models.TaskFeeEvent, error) {
+	invalidEvents := make([]models.TaskFeeEvent, 0)
+	candidateEvents := make([]models.TaskFeeEvent, 0)
+
 	var taskIDCommitments []string
-	taskFeeEventMap := make(map[string]models.TaskFeeEvent)
+	taskIDCommitmentMap := make(map[string]struct{})
+	var withdrawIDs []uint
 	for _, event := range events {
-		taskIDCommitments = append(taskIDCommitments, event.TaskIDCommitment)
-		taskFeeEventMap[event.TaskIDCommitment] = event
+		reasons := strings.Split(event.Reason, "-")
+		if len(reasons) != 2 {
+			invalidEvents = append(invalidEvents, event)
+			continue
+		}
+		eventType := reasons[0]
+		if eventType != fmt.Sprintf("%d", event.Type) {
+			invalidEvents = append(invalidEvents, event)
+			continue
+		}
+		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw {
+			taskIDCommitment := reasons[1]
+			if _, ok := taskIDCommitmentMap[taskIDCommitment]; !ok {
+				taskIDCommitmentMap[taskIDCommitment] = struct{}{}
+				taskIDCommitments = append(taskIDCommitments, taskIDCommitment)
+			}
+		} else {
+			withdrawID, err := strconv.ParseUint(reasons[1], 10, 64)
+			if err != nil {
+				invalidEvents = append(invalidEvents, event)
+				continue
+			}
+			withdrawIDs = append(withdrawIDs, uint(withdrawID))
+		}
+		candidateEvents = append(candidateEvents, event)
 	}
 
 	var tasks []models.InferenceTask
-	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := db.WithContext(dbCtx).
-		Where("task_id_commitment IN (?)", taskIDCommitments).
-		Find(&tasks).Error; err != nil {
+	if err := func () error {
+		dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := db.WithContext(dbCtx).
+			Where("task_id_commitment IN (?)", taskIDCommitments).
+			Find(&tasks).Error; err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
 		return nil, nil, err
 	}
 	taskMap := make(map[string]models.InferenceTask)
@@ -103,23 +138,49 @@ func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mod
 		taskMap[task.TaskIDCommitment] = task
 	}
 
+	var withdrawRecords []models.WithdrawRecord
+	if err := func () error {
+		dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := db.WithContext(dbCtx).Where("id IN (?)", withdrawIDs).Find(&withdrawRecords).Error; err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return nil, nil, err
+	}
+	withdrawRecordMap := make(map[uint]models.WithdrawRecord)
+	for _, withdrawRecord := range withdrawRecords {
+		withdrawRecordMap[withdrawRecord.ID] = withdrawRecord
+	}
+
 	validEvents := make([]models.TaskFeeEvent, 0)
-	invalidEvents := make([]models.TaskFeeEvent, 0)
-	for taskIDCommitment, event := range taskFeeEventMap {
-		if task, exists := taskMap[taskIDCommitment]; exists {
-			if task.Status == models.TaskValidated || task.Status == models.TaskGroupValidated {
-				continue
-			} else if task.Status == models.TaskEndSuccess || task.Status == models.TaskEndGroupSuccess || task.Status == models.TaskEndGroupRefund {
-				if event.TaskFee.Int.Cmp(&task.TaskFee.Int) > 0 {
-					invalidEvents = append(invalidEvents, event)
+	for _, event := range candidateEvents {
+		reasons := strings.Split(event.Reason, "-")
+		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw {
+			taskIDCommitment := reasons[1]
+			if task, exists := taskMap[taskIDCommitment]; exists {
+				if task.Status == models.TaskValidated || task.Status == models.TaskGroupValidated {
 					continue
+				} else if task.Status == models.TaskEndSuccess || task.Status == models.TaskEndGroupSuccess || task.Status == models.TaskEndGroupRefund {
+					if event.TaskFee.Int.Cmp(&task.TaskFee.Int) > 0 {
+						invalidEvents = append(invalidEvents, event)
+						continue
+					}
+					validEvents = append(validEvents, event)
+				} else {
+					invalidEvents = append(invalidEvents, event)
 				}
-				validEvents = append(validEvents, event)
 			} else {
 				invalidEvents = append(invalidEvents, event)
 			}
 		} else {
-			invalidEvents = append(invalidEvents, event)
+			withdrawID, _ := strconv.ParseUint(reasons[1], 10, 64)
+			if _, exists := withdrawRecordMap[uint(withdrawID)]; exists {
+				validEvents = append(validEvents, event)
+			} else {
+				invalidEvents = append(invalidEvents, event)
+			}
 		}
 	}
 
@@ -433,7 +494,7 @@ func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 	}
 }
 
-func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func() error, error) {
+func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int, taskType models.TaskType) (func() error, error) {
 	appConfig := config.GetConfig()
 	daoFee := big.NewInt(0).Mul(amount, big.NewInt(0).SetUint64(appConfig.Dao.Percent))
 	daoFee.Div(daoFee, big.NewInt(100))
@@ -441,22 +502,29 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	reward := big.NewInt(0).Sub(amount, daoFee)
 
 	rewardEvent := &models.TaskFeeEvent{
-		TaskIDCommitment: taskIDCommitment,
 		Address:          address,
 		TaskFee:          models.BigInt{Int: *new(big.Int).Set(reward)},
 		CreatedAt:        time.Now(),
 		Status:           models.TaskFeeEventStatusPending,
+		Type:             models.TaskFeeEventTypeTask,
+		Reason:           fmt.Sprintf("%d-%s", models.TaskFeeEventTypeTask, taskIDCommitment),
 	}
 	daoEvent := &models.TaskFeeEvent{
-		TaskIDCommitment: taskIDCommitment,
 		Address:          appConfig.Dao.Address,
 		TaskFee:          models.BigInt{Int: *new(big.Int).Set(daoFee)},
 		CreatedAt:        time.Now(),
 		Status:           models.TaskFeeEventStatusPending,
+		Type:             models.TaskFeeEventTypeTask,
+		Reason:           fmt.Sprintf("%d-%s", models.TaskFeeEventTypeDraw, taskIDCommitment),
 	}
 	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
 
 	if err := db.Create(events).Error; err != nil {
+		return nil, err
+	}
+
+	incentive, _ := utils.WeiToEther(reward).Float64()
+	if err := addNodeIncentive(ctx, db, address, incentive, taskType); err != nil {
 		return nil, err
 	}
 
@@ -495,6 +563,35 @@ func withdrawTaskFee(ctx context.Context, db *gorm.DB, address string, amount *b
 			return ErrInsufficientTaskFee
 		}
 		taskFee.Sub(taskFee, amountCopy)
+		return nil
+	}
+
+	return commitFunc, nil
+}
+
+func fulfillWithdrawTaskFee(ctx context.Context, db *gorm.DB, withdrawID uint, withdrawalFeeAddress string, withdrawalFee *big.Int) (func() error, error) {
+	event := &models.TaskFeeEvent{
+		Address:          withdrawalFeeAddress,
+		TaskFee:          models.BigInt{Int: *new(big.Int).Set(withdrawalFee)},
+		CreatedAt:        time.Now(),
+		Status:           models.TaskFeeEventStatusPending,
+		Type:             models.TaskFeeEventTypeWithdrawalFee,
+		Reason:           fmt.Sprintf("%d-%d", models.TaskFeeEventTypeWithdrawalFee, withdrawID),
+	}
+	if err := db.Create(event).Error; err != nil {
+		return nil, err
+	}
+
+	taskFee, err := getTaskFeeFromCache(ctx, db, withdrawalFeeAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	amountCopy := new(big.Int).Set(withdrawalFee)
+	commitFunc := func() error {
+		taskFeeCache.mu.Lock()
+		defer taskFeeCache.mu.Unlock()
+		taskFee.Add(taskFee, amountCopy)
 		return nil
 	}
 

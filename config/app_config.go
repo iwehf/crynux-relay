@@ -79,8 +79,9 @@ type AppConfig struct {
 	} `mapstructure:"task_schema"`
 
 	Withdraw struct {
-		Address       string `mapstructure:"address"`
-		WithdrawalFee uint64 `mapstructure:"withdrawal_fee"`
+		Address              string `mapstructure:"address"`
+		WithdrawalFee        uint64 `mapstructure:"withdrawal_fee"`
+		WithdrawalFeeAddress string `mapstructure:"withdrawal_fee_address"`
 	} `mapstructure:"withdraw"`
 
 	Credits struct {

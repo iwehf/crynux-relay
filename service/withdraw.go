@@ -21,6 +21,9 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 	defer cancel()
 
 	withdrawalFee := utils.EtherToWei(big.NewInt(0).SetUint64(appConfig.Withdraw.WithdrawalFee))
+	if address == appConfig.Withdraw.WithdrawalFeeAddress || address == appConfig.Dao.Address {
+		withdrawalFee = big.NewInt(0)
+	}
 	record := &models.WithdrawRecord{
 		Address:        address,
 		BenefitAddress: benefitAddress,
@@ -60,6 +63,7 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 }
 
 func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint, txHash string) error {
+	appConfig := config.GetConfig()
 
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -90,6 +94,15 @@ func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint, txHash s
 			return err
 		}
 
+		if record.WithdrawalFee.Cmp(big.NewInt(0)) > 0 {
+			commitFunc, err := fulfillWithdrawTaskFee(ctx, tx, record.ID, appConfig.Withdraw.WithdrawalFeeAddress, &record.WithdrawalFee.Int)
+			if err != nil {
+				return err
+			}
+			if err := commitFunc(); err != nil {
+				return err
+			}
+		}
 		return nil
 	}); err != nil {
 		return err

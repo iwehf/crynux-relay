@@ -20,11 +20,20 @@ const (
 	TaskFeeEventStatusInvalid
 )
 
+type TaskFeeEventType int8
+
+const (
+	TaskFeeEventTypeTask TaskFeeEventType = iota
+	TaskFeeEventTypeDraw
+	TaskFeeEventTypeWithdrawalFee
+)
+
 type TaskFeeEvent struct {
-	ID               uint               `json:"id" gorm:"primarykey"`
-	CreatedAt        time.Time          `json:"created_at" gorm:"not null"`
-	TaskIDCommitment string             `json:"task_id_commitment" gorm:"not null;uniqueIndex"`
-	Address          string             `json:"address" gorm:"not null;index"`
-	TaskFee          BigInt             `json:"task_fee" gorm:"not null"`
-	Status           TaskFeeEventStatus `json:"status" gorm:"not null;default:0;index"`
+	ID        uint               `json:"id" gorm:"primarykey"`
+	CreatedAt time.Time          `json:"created_at" gorm:"not null"`
+	Address   string             `json:"address" gorm:"not null;index"`
+	TaskFee   BigInt             `json:"task_fee" gorm:"not null"`
+	Status    TaskFeeEventStatus `json:"status" gorm:"not null;default:0;index"`
+	Reason    string             `json:"reason" gorm:"not null;uniqueIndex"`
+	Type      TaskFeeEventType   `json:"type" gorm:"not null;index"`
 }
