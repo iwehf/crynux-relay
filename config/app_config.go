@@ -85,4 +85,9 @@ type AppConfig struct {
 	Credits struct {
 		Address string `mapstructure:"address"`
 	} `mapstructure:"credits"`
+
+	Dao struct {
+		Address string `mapstructure:"address"`
+		Percent uint64 `mapstructure:"percent"`
+	} `mapstructure:"dao"`
 }

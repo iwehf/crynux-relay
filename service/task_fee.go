@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crynux_relay/config"
 	"crynux_relay/models"
 	"fmt"
 	"math/big"
@@ -430,27 +431,45 @@ func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 }
 
 func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int) (func() error, error) {
-	event := &models.TaskFeeEvent{
+	appConfig := config.GetConfig()
+	daoFee := big.NewInt(0).Mul(amount, big.NewInt(0).SetUint64(appConfig.Dao.Percent))
+	daoFee.Div(daoFee, big.NewInt(100))
+
+	reward := big.NewInt(0).Sub(amount, daoFee)
+
+	rewardEvent := &models.TaskFeeEvent{
 		TaskIDCommitment: taskIDCommitment,
 		Address:          address,
-		TaskFee:          models.BigInt{Int: *new(big.Int).Set(amount)},
+		TaskFee:          models.BigInt{Int: *new(big.Int).Set(reward)},
 		CreatedAt:        time.Now(),
 		Status:           models.TaskFeeEventStatusPending,
 	}
+	daoEvent := &models.TaskFeeEvent{
+		TaskIDCommitment: taskIDCommitment,
+		Address:          appConfig.Dao.Address,
+		TaskFee:          models.BigInt{Int: *new(big.Int).Set(daoFee)},
+		CreatedAt:        time.Now(),
+		Status:           models.TaskFeeEventStatusPending,
+	}
+	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
 
-	if err := db.Create(event).Error; err != nil {
+	if err := db.Create(events).Error; err != nil {
 		return nil, err
 	}
 
-	taskFee, err := getTaskFeeFromCache(ctx, db, address)
+	nodeTaskFee, err := getTaskFeeFromCache(ctx, db, address)
 	if err != nil {
 		return nil, err
 	}
-	amountCopy := new(big.Int).Set(amount)
+	daoTaskFee, err := getTaskFeeFromCache(ctx, db, appConfig.Dao.Address)
+	if err != nil {
+		return nil, err
+	}
 	commitFunc := func() error {
 		taskFeeCache.mu.Lock()
 		defer taskFeeCache.mu.Unlock()
-		taskFee.Add(taskFee, amountCopy)
+		nodeTaskFee.Add(nodeTaskFee, reward)
+		daoTaskFee.Add(daoTaskFee, daoFee)
 		return nil
 	}
 
