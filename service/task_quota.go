@@ -439,7 +439,7 @@ func StartNativeTokenListener(ctx context.Context) {
 	// Start the listener goroutine
 	for network := range appConfig.Blockchains {
 		go func() {
-			if err := runNativeTokenListener(ctx, config.GetDB(), network); err != nil {
+			if err := runNativeTokenListener(ctx, config.GetDB(), network, appConfig.Quota.Address); err != nil {
 				log.Errorf("Native token listener failed: %v", err)
 			}
 		}()
@@ -449,7 +449,7 @@ func StartNativeTokenListener(ctx context.Context) {
 }
 
 // runNativeTokenListener runs the native token transfer listener
-func runNativeTokenListener(ctx context.Context, db *gorm.DB, network string) error {
+func runNativeTokenListener(ctx context.Context, db *gorm.DB, network string, targetAddress string) error {
 	ticker := time.NewTicker(5 * time.Second) // Check for new blocks every 5 seconds
 	defer ticker.Stop()
 
@@ -463,7 +463,7 @@ func runNativeTokenListener(ctx context.Context, db *gorm.DB, network string) er
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := processNewBlocks(ctx, db, client); err != nil {
+			if err := processNewBlocks(ctx, db, client, targetAddress); err != nil {
 				log.Errorf("Failed to process new blocks: %v", err)
 			}
 		}
@@ -471,7 +471,7 @@ func runNativeTokenListener(ctx context.Context, db *gorm.DB, network string) er
 }
 
 // processNewBlocks processes new blocks
-func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient) error {
+func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, targetAddress string) error {
 	// Get current block height
 	latestBlock, err := client.RpcClient.BlockByNumber(ctx, nil)
 	if err != nil {
@@ -501,7 +501,7 @@ func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.Block
 	log.Infof("Processing blocks from %d to %d", startBlock, endBlock)
 
 	for blockNum := startBlock; blockNum <= endBlock; blockNum++ {
-		if err := processBlock(ctx, db, client, blockNum); err != nil {
+		if err := processBlock(ctx, db, client, blockNum, targetAddress); err != nil {
 			log.Errorf("Failed to process block %d: %v", blockNum, err)
 			continue
 		}
@@ -519,7 +519,7 @@ func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.Block
 }
 
 // processBlock processes a single block
-func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, blockNum uint64) error {
+func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, blockNum uint64, targetAddress string) error {
 	block, err := client.RpcClient.BlockByNumber(ctx, big.NewInt(int64(blockNum)))
 	if err != nil {
 		return fmt.Errorf("failed to get block %d: %w", blockNum, err)
@@ -527,7 +527,7 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 
 	// Check transactions in the block
 	for _, tx := range block.Transactions() {
-		if err := processTransaction(ctx, db, tx, client); err != nil {
+		if err := processTransaction(ctx, db, tx, client, targetAddress); err != nil {
 			log.Errorf("Failed to process transaction %s: %v", tx.Hash().Hex(), err)
 			continue
 		}
@@ -537,14 +537,14 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 }
 
 // processTransaction processes a single transaction
-func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient) error {
+func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient, targetAddress string) error {
 	// Only process native token transfers (to field is not empty and data field is empty)
 	if tx.To() == nil || len(tx.Data()) > 0 {
 		return nil
 	}
 
 	// Check if transfer is to the target address
-	if !strings.EqualFold(tx.To().Hex(), client.Address) {
+	if !strings.EqualFold(tx.To().Hex(), targetAddress) {
 		return nil
 	}
 
