@@ -22,6 +22,9 @@ func CreateTask(ctx context.Context, db *gorm.DB, task *models.InferenceTask) er
 		if err := task.Create(ctx, tx); err != nil {
 			return err
 		}
+		if err := models.AddTotalTask(ctx, tx); err != nil {
+			return err
+		}
 		commitFunc, err := SpendTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err

@@ -110,11 +110,6 @@ func syncNodeNumber(ctx context.Context) error {
 }
 
 func syncTaskNumber(ctx context.Context) error {
-	totalTasks, err := models.GetTotalTaskCount(ctx, config.GetDB())
-	if err != nil {
-		log.Errorf("SyncNetwork: error getting total task count %v", err)
-		return err
-	}
 	runningTasks, err := models.GetRunningTaskCount(ctx, config.GetDB())
 	if err != nil {
 		log.Errorf("SyncNetwork: error getting running task count %v", err)
@@ -127,7 +122,6 @@ func syncTaskNumber(ctx context.Context) error {
 	}
 
 	taskNumber := models.NetworkTaskNumber{
-		TotalTasks:   uint64(totalTasks),
 		RunningTasks: uint64(runningTasks),
 		QueuedTasks:  uint64(queuedTasks),
 	}
