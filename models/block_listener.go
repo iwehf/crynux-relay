@@ -26,7 +26,7 @@ func GetNativeTokenListener(ctx context.Context, db *gorm.DB, network string) (*
 		return nil, errors.New("blockchain not found")
 	}
 	var listener NativeTokenListener
-	err := db.WithContext(dbCtx).Model(&NativeTokenListener{}).Attrs(&NativeTokenListener{
+	err := db.WithContext(dbCtx).Model(&NativeTokenListener{}).Where("network = ?", network).Attrs(&NativeTokenListener{
 		LastBlockNum:   blockchain.StartBlockNum,
 		LastUpdateTime: time.Now(),
 		Network: network,
