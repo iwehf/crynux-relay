@@ -438,11 +438,11 @@ func StartNativeTokenListener(ctx context.Context) {
 
 	// Start the listener goroutine
 	for network := range appConfig.Blockchains {
-		go func() {
+		go func(network string) {
 			if err := runNativeTokenListener(ctx, config.GetDB(), network, appConfig.Quota.Address); err != nil {
 				log.Errorf("Native token listener failed: %v", err)
 			}
-		}()
+		}(network)
 	}
 
 	log.Info("Native token listener started")
