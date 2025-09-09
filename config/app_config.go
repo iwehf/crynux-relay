@@ -80,6 +80,7 @@ type AppConfig struct {
 
 	Withdraw struct {
 		Address              string `mapstructure:"address"`
+		MinWithdrawalAmount  uint64 `mapstructure:"min_withdrawal_amount"`
 		WithdrawalFee        uint64 `mapstructure:"withdrawal_fee"`
 		WithdrawalFeeAddress string `mapstructure:"withdrawal_fee_address"`
 	} `mapstructure:"withdraw"`

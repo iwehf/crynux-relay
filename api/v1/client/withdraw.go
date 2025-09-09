@@ -7,6 +7,7 @@ import (
 	"crynux_relay/blockchain"
 	"crynux_relay/config"
 	"crynux_relay/service"
+	"crynux_relay/utils"
 	"errors"
 	"math/big"
 
@@ -69,6 +70,13 @@ func CreateWithdrawRequest(c *gin.Context, in *CreateWithdrawInput) (*CreateWith
 	}
 	if benefitAddress != *in.BenefitAddress {
 		validationErr := response.NewValidationErrorResponse("benefit_address", "Benefit address mismatch")
+		return nil, validationErr
+	}
+
+	appConfig := config.GetConfig()
+	minWithdrawalAmount := utils.EtherToWei(big.NewInt(0).SetUint64(appConfig.Withdraw.MinWithdrawalAmount))
+	if amount.Cmp(minWithdrawalAmount) < 0 {
+		validationErr := response.NewValidationErrorResponse("amount", "Amount is too small")
 		return nil, validationErr
 	}
 
