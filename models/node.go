@@ -167,7 +167,7 @@ func GetAllNodeCount(ctx context.Context, db *gorm.DB) (int64, error) {
 	defer cancel()
 
 	var res int64
-	if err := db.WithContext(dbCtx).Model(&Node{}).Count(&res).Error; err != nil {
+	if err := db.WithContext(dbCtx).Model(&NetworkNodeData{}).Count(&res).Error; err != nil {
 		return 0, err
 	}
 	return res, nil
