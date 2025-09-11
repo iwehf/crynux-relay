@@ -31,7 +31,15 @@ func GetBenefitAddress(ctx context.Context, nodeAddress common.Address, network 
 		Context: callCtx,
 	}
 
-	return client.BenefitAddressContractInstance.GetBenefitAddress(opts, nodeAddress)
+	ba, err := client.BenefitAddressContractInstance.GetBenefitAddress(opts, nodeAddress)
+	if err != nil {
+		return common.Address{}, err
+	}
+	if ba.Big().Cmp(big.NewInt(0)) == 0 {
+		return nodeAddress, nil
+	} else {
+		return ba, nil
+	}
 }
 
 func SetBenefitAddress(ctx context.Context, benefitAddress common.Address, network string) (string, error) {
