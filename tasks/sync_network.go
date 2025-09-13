@@ -70,6 +70,7 @@ func getNodeData(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.
 			}
 			nodesData[i].Balance = models.BigInt{Int: *taskFee}
 			nodesData[i].QoS = node.QOSScore
+			nodesData[i].Staking = models.BigInt{Int: node.StakeAmount.Int}
 		}
 	}
 	return nodesData, nil
@@ -234,7 +235,7 @@ func batchUpsertNodeData(ctx context.Context, nodeDatas []models.NetworkNodeData
 
 	return config.GetDB().WithContext(dbCtx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "address"}},
-		DoUpdates: clause.AssignmentColumns([]string{"balance", "qo_s", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"balance", "qo_s", "staking", "updated_at"}),
 	}).CreateInBatches(nodeDatas, len(nodeDatas)).Error
 }
 
