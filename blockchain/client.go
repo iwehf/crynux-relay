@@ -45,7 +45,7 @@ type BlockchainClient struct {
 }
 
 var blockchainClients = make(map[string]*BlockchainClient)
-var pattern *regexp.Regexp = regexp.MustCompile(`[Nn]once`)
+var pattern *regexp.Regexp = regexp.MustCompile(`(?i)nonce`)
 var ErrBlockchainNotFound = errors.New("blockchain not found")
 
 func GetBlockchainClient(network string) (*BlockchainClient, error) {
