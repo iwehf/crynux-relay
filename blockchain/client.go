@@ -41,6 +41,7 @@ type BlockchainClient struct {
 	Nonce                          *uint64
 	NonceMu                        sync.Mutex
 	Limiter                        *rate.Limiter
+	SentTransactionCountLimit      uint64
 }
 
 var blockchainClients = make(map[string]*BlockchainClient)
@@ -113,6 +114,7 @@ func initBlockchainClient(ctx context.Context, network string) error {
 		Nonce:                          &nonce,
 		NonceMu:                        sync.Mutex{},
 		Limiter:                        limiter,
+		SentTransactionCountLimit:      blockchain.SentTransactionCountLimit,
 	}
 	return nil
 }

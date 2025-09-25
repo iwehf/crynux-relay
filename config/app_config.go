@@ -65,6 +65,7 @@ type AppConfig struct {
 		MaxRetries      uint8  `mapstructure:"max_retries"`
 		RetryInterval   uint64 `mapstructure:"retry_interval"`
 		ReceiptWaitTime uint64 `mapstructure:"receipt_wait_time"`
+		SentTransactionCountLimit uint64 `mapstructure:"sent_transaction_count_limit"`
 	} `mapstructure:"blockchains"`
 
 	Task struct {
