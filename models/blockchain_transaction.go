@@ -5,6 +5,7 @@ import (
 	"crynux_relay/config"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -98,6 +99,16 @@ func GetSentTransactions(ctx context.Context, db *gorm.DB, offset, limit int) ([
 	return transactions, nil
 }
 
+func GetSentTransactionCountByNetwork(ctx context.Context, db *gorm.DB, network string) (int64, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var count int64
+	if err := db.WithContext(dbCtx).Model(&BlockchainTransaction{}).Where("network = ?", network).Where("status = ?", TransactionStatusSent).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // GetTransactionByHash gets a transaction by its hash
 func GetTransactionByHash(ctx context.Context, db *gorm.DB, txHash string) (*BlockchainTransaction, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -148,7 +159,11 @@ func (tx *BlockchainTransaction) MarkFailed(ctx context.Context, db *gorm.DB, bl
 		"block_number":        blockNumber,
 		"gas_used":            gasUsed,
 		"effective_gas_price": effectiveGasPrice,
-		"status_message":       errorMsg,
+		"status_message":      errorMsg,
+	}
+	// make tx_hash unique
+	if tx.TxHash.Valid {
+		updates["tx_hash"] = tx.TxHash.String + "_" + strconv.FormatInt(int64(tx.RetryCount), 10)
 	}
 
 	return tx.Update(ctx, db, updates)
