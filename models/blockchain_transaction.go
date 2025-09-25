@@ -32,6 +32,7 @@ type BlockchainTransaction struct {
 	Data               sql.NullString    `json:"data" gorm:"null"`
 	TxHash             sql.NullString    `json:"tx_hash" gorm:"null;uniqueIndex"`
 	BlockNumber        sql.NullInt64     `json:"block_number" gorm:"null"`
+	Nonce              sql.NullInt64     `json:"nonce" gorm:"null"`
 	GasUsed            sql.NullInt64     `json:"gas_used" gorm:"null"`
 	EffectiveGasPrice  sql.NullString    `json:"effective_gas_price" gorm:"null"`
 	StatusMessage      sql.NullString    `json:"status_message" gorm:"null"`
@@ -117,10 +118,11 @@ func GetTransactionByID(ctx context.Context, db *gorm.DB, id uint) (*BlockchainT
 	return &transaction, nil
 }
 
-func (tx *BlockchainTransaction) MarkSent(ctx context.Context, db *gorm.DB, txHash string) error {
+func (tx *BlockchainTransaction) MarkSent(ctx context.Context, db *gorm.DB, txHash string, nonce int64) error {
 	updates := map[string]interface{}{
 		"status":  TransactionStatusSent,
 		"tx_hash": txHash,
+		"nonce":   nonce,
 		"sent_at": time.Now(),
 	}
 

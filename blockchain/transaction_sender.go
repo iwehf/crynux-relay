@@ -159,13 +159,13 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 
 
 	// Send transaction based on type
-	txHash, err := ts.sendRawTransaction(ctx, transaction)
+	txHash, nonce, err := ts.sendRawTransaction(ctx, transaction)
 	if err != nil {
 		return err
 	}
 
 	// Update transaction status to sent
-	if err := transaction.MarkSent(ctx, ts.db, txHash); err != nil {
+	if err := transaction.MarkSent(ctx, ts.db, txHash, nonce); err != nil {
 		return err
 	}
 
@@ -174,19 +174,19 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 }
 
 // sendRawTransaction sends a raw transaction to the blockchain
-func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction *models.BlockchainTransaction) (string, error) {
+func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction *models.BlockchainTransaction) (string, int64, error) {
 	client, err := GetBlockchainClient(transaction.Network)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	if transaction.FromAddress != client.Address {
-		return "", fmt.Errorf("from address is not the same as the client address")
+		return "", 0, fmt.Errorf("from address is not the same as the client address")
 	}
 
 	auth, err := client.GetAuth(ctx)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	client.NonceMu.Lock()
@@ -194,7 +194,7 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 
 	nonce, err := client.GetNonce(ctx)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	auth.Nonce = big.NewInt(int64(nonce))
@@ -211,7 +211,7 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 	if transaction.Data.Valid {
 		data, err = hexutil.Decode(transaction.Data.String)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 	}
 
@@ -228,16 +228,16 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, transaction
 
 	signedTx, err := auth.Signer(auth.From, rawTx)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	err = client.RpcClient.SendTransaction(callCtx, signedTx)
 	if err != nil {
 		err = client.processSendingTxError(err)
-		return "", err
+		return "", 0, err
 	}
 
 	client.IncrementNonce()
 
-	return signedTx.Hash().Hex(), nil
+	return signedTx.Hash().Hex(), int64(nonce), nil
 }
