@@ -115,8 +115,12 @@ func selectNodesByScore(nodes []models.Node, scores []float64, n int) []models.N
 	}
 	res := make([]models.Node, n)
 	for i := 0; i < n; i++ {
-		idx, _ := w.Take()
-		res[i] = nodes[idx]
+		idx, ok := w.Take()
+		if ok {
+			res[i] = nodes[idx]
+		} else {
+			res[i] = nodes[i]
+		}
 	}
 	return res
 }
