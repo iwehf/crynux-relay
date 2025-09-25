@@ -184,6 +184,7 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 	txHash, err := ts.sendRawTransaction(ctx, client, transaction, nonce)
 	if err != nil {
 		log.Errorf("Failed to send raw transaction %d, nonce: %d, %v", transaction.ID, nonce, err)
+		err = client.processSendingTxError(err)
 		return err
 	}
 
