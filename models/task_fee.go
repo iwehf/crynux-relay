@@ -1,6 +1,9 @@
 package models
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -26,6 +29,7 @@ const (
 	TaskFeeEventTypeTask TaskFeeEventType = iota
 	TaskFeeEventTypeDraw
 	TaskFeeEventTypeWithdrawalFee
+	TaskFeeEventTypeBought
 )
 
 type TaskFeeEvent struct {
@@ -36,4 +40,18 @@ type TaskFeeEvent struct {
 	Status    TaskFeeEventStatus `json:"status" gorm:"not null;default:0;index"`
 	Reason    string             `json:"reason" gorm:"not null;uniqueIndex"`
 	Type      TaskFeeEventType   `json:"type" gorm:"not null;index"`
+}
+
+func GetTaskFeeBoughtEvent(ctx context.Context, db *gorm.DB, txHash, network string) (*TaskFeeEvent, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var event TaskFeeEvent
+	if err := db.WithContext(dbCtx).Where("reason = ?", fmt.Sprintf("%d-%s-%s", TaskFeeEventTypeBought, txHash, network)).First(&event).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &event, nil
+
 }

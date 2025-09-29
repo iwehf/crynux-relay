@@ -95,7 +95,11 @@ type AppConfig struct {
 		Percent uint64 `mapstructure:"percent"`
 	} `mapstructure:"dao"`
 
-	Quota struct {
+	BuyQuota struct {
 		Address string `mapstructure:"address"`
-	} `mapstructure:"quota"`
+	} `mapstructure:"buy_quota"`
+
+	BuyTaskFee struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"buy_task_fee"`
 }
