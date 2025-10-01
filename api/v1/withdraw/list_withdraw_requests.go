@@ -6,6 +6,7 @@ import (
 	"crynux_relay/api/v1/validate"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +55,7 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 
 	var records []models.WithdrawRecord
 
-	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	if err := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id > ?", in.StartID).Order("id ASC").Limit(in.Limit).Find(&records).Error; err != nil {
@@ -64,6 +65,8 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 	results := make([]WithdrawRecord, 0, len(records))
 	if len(records) > 0 {
 		lastID := records[0].ID
+		appConfig := config.GetConfig()
+		invalidIDs := make([]uint, 0)
 		for i, record := range records {
 			if record.LocalStatus == models.WithdrawLocalStatusPending || (i > 0 && record.ID != lastID+1) {
 				break
@@ -72,6 +75,11 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 			lastID = record.ID
 
 			if record.LocalStatus == models.WithdrawLocalStatusProcessed {
+				valid := utils.VerifyMAC([]byte(record.MACString()), appConfig.MAC.SecretKey, record.MAC)
+				if !valid {
+					invalidIDs = append(invalidIDs, record.ID)
+					continue
+				}
 				results = append(results, WithdrawRecord{
 					ID:             record.ID,
 					CreatedAt:      uint64(record.CreatedAt.Unix()),
@@ -83,6 +91,12 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 					TaskFeeEventID: record.TaskFeeEventID,
 					WithdrawalFee:  record.WithdrawalFee.String(),
 				})
+			}
+		}
+
+		if len(invalidIDs) > 0 {
+			if err := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id IN (?)", invalidIDs).Update("local_status", models.WithdrawLocalStatusInvalid).Error; err != nil {
+				return nil, err
 			}
 		}
 	}

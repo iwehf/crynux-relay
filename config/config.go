@@ -44,6 +44,7 @@ func InitConfig(configPath string) error {
 			appConfig.Blockchains[network] = blockchain
 		}
 		appConfig.Http.JWT.SecretKey = GetTestJWTKey()
+		appConfig.MAC.SecretKey = GetTestTaskFeeMACKey()
 	} else {
 		// Load hard-coded private key
 		for network := range appConfig.Blockchains {
@@ -52,6 +53,7 @@ func InitConfig(configPath string) error {
 			appConfig.Blockchains[network] = blockchain
 		}
 		appConfig.Http.JWT.SecretKey = ReadFromFile(appConfig.Http.JWT.SecretKeyFile)
+		appConfig.MAC.SecretKey = ReadFromFile(appConfig.MAC.SecretKeyFile)
 	}
 	if err := checkBlockchainAccount(); err != nil {
 		return err
@@ -66,33 +68,33 @@ func checkBlockchainAccount() error {
 		if blockchain.Account.PrivateKey == "" {
 			return errors.New("blockchain account private key not set")
 		}
-	
+
 		if blockchain.Account.Address == "" {
 			return errors.New("blockchain account address not set")
 		}
-	
+
 		var pk string
 		if strings.HasPrefix(blockchain.Account.PrivateKey, "0x") {
 			pk = blockchain.Account.PrivateKey[2:]
 		} else {
 			pk = blockchain.Account.PrivateKey
 		}
-	
+
 		// Check private key and address
 		privateKey, err := crypto.HexToECDSA(pk)
 		if err != nil {
 			return err
 		}
-	
+
 		publicKey := privateKey.Public()
-	
+
 		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
 			return errors.New("error casting public key to ECDSA")
 		}
-	
+
 		address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
-	
+
 		if address != blockchain.Account.Address {
 			return errors.New("account address and private key mismatch")
 		}
@@ -114,6 +116,10 @@ func GetTestPrivateKey() string {
 }
 
 func GetTestJWTKey() string {
+	return ""
+}
+
+func GetTestTaskFeeMACKey() string {
 	return ""
 }
 

@@ -6,6 +6,7 @@ import (
 	"crynux_relay/api/v1/validate"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,7 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 
 	var events []models.TaskFeeEvent
 
-	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	if err := config.GetDB().WithContext(dbCtx).Model(&models.TaskFeeEvent{}).Where("id > ?", in.StartID).Order("id ASC").Limit(in.Limit).Find(&events).Error; err != nil {
@@ -60,7 +61,8 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 	logs := make([]TaskFeeLog, 0, len(events))
 	if len(events) > 0 {
 		lastID := events[0].ID
-
+		appConfig := config.GetConfig()
+		invalidIDs := make([]uint, 0)
 		for i, event := range events {
 			if event.Status == models.TaskFeeEventStatusPending || (i > 0 && event.ID != lastID+1) {
 				break
@@ -69,12 +71,23 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 			lastID = event.ID
 
 			if event.Status == models.TaskFeeEventStatusProcessed {
+				valid := utils.VerifyMAC([]byte(event.Reason), appConfig.MAC.SecretKey, event.MAC)
+				if !valid {
+					invalidIDs = append(invalidIDs, event.ID)
+					continue
+				}
 				logs = append(logs, TaskFeeLog{
 					ID:        event.ID,
 					CreatedAt: uint64(event.CreatedAt.Unix()),
 					Address:   event.Address,
 					TaskFee:   event.TaskFee.String(),
 				})
+			}
+		}
+
+		if len(invalidIDs) > 0 {
+			if err := config.GetDB().WithContext(dbCtx).Model(&models.TaskFeeEvent{}).Where("id IN (?)", invalidIDs).Update("status", models.TaskFeeEventStatusInvalid).Error; err != nil {
+				return nil, err
 			}
 		}
 	}

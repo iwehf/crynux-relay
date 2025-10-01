@@ -237,23 +237,33 @@ func validatePendingWithdrawEvents(ctx context.Context, db *gorm.DB, events []mo
 		addresses = append(addresses, event.Address)
 	}
 
-	var taskFees []models.TaskFee
-	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := db.WithContext(dbCtx).Where("address IN (?)", addresses).Find(&taskFees).Error; err != nil {
+	taskFees, err := models.GetTaskFees(ctx, db, addresses)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	existedTaskFeeAddressMap := make(map[string]struct{})
+	lastProcessedTaskFeeEventID, err := models.GetLastProcessedTaskFeeEventID(ctx, db)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	existedTaskFeeAddressMap := make(map[string]*models.TaskFee)
 	for _, taskFee := range taskFees {
-		existedTaskFeeAddressMap[taskFee.Address] = struct{}{}
+		existedTaskFeeAddressMap[taskFee.Address] = &taskFee
 	}
 
 	validEvents := make([]models.WithdrawRecord, 0)
 	invalidEvents := make([]models.WithdrawRecord, 0)
 	for _, event := range events {
-		if _, exists := existedTaskFeeAddressMap[event.Address]; exists {
-			validEvents = append(validEvents, event)
+		if event.TaskFeeEventID > lastProcessedTaskFeeEventID {
+			continue
+		}
+		if taskFee, exists := existedTaskFeeAddressMap[event.Address]; exists {
+			if event.Status != models.WithdrawStatusFailed && taskFee.TaskFee.Int.Cmp(&event.Amount.Int) < 0 {
+				invalidEvents = append(invalidEvents, event)
+			} else {
+				validEvents = append(validEvents, event)
+			}
 		} else {
 			invalidEvents = append(invalidEvents, event)
 		}
@@ -363,6 +373,12 @@ func processPendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mode
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	appConfig := config.GetConfig()
+	eventMACs := make(map[string]string)
+	for _, event := range validEvents {
+		eventMACs[event.Address] = utils.GenerateMAC([]byte(event.Reason), appConfig.MAC.SecretKey)
+	}
+
 	return db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
 		var existedTaskFees []models.TaskFee
 		if err := tx.Model(&models.TaskFee{}).Where("address IN (?)", addresses).Find(&existedTaskFees).Error; err != nil {
@@ -402,7 +418,16 @@ func processPendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mode
 			}
 		}
 
-		if err := tx.Model(&models.TaskFeeEvent{}).Where("id IN (?)", eventIDs).Where("status = ?", models.TaskFeeEventStatusPending).Update("status", models.TaskFeeEventStatusProcessed).Error; err != nil {
+		var macCases string
+		for address, mac := range eventMACs {
+			macCases += fmt.Sprintf(" WHEN address = '%s' THEN '%s'", address, mac)
+		}
+		updates := map[string]interface{}{
+			"mac": gorm.Expr("CASE" + macCases + " END"),
+			"status": models.TaskFeeEventStatusProcessed,
+		}
+
+		if err := tx.Model(&models.TaskFeeEvent{}).Where("id IN (?)", eventIDs).Where("status = ?", models.TaskFeeEventStatusPending).Updates(updates).Error; err != nil {
 			return err
 		}
 
@@ -441,6 +466,12 @@ func processPendingWithdrawEvents(ctx context.Context, db *gorm.DB, events []mod
 		addresses = append(addresses, address)
 	}
 
+	appConfig := config.GetConfig()
+	eventMACs := make(map[string]string)
+	for _, event := range validEvents {
+		eventMACs[event.Address] = utils.GenerateMAC([]byte(event.MACString()), appConfig.MAC.SecretKey)
+	}
+
 	return db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
 		var existedTaskFees []models.TaskFee
 		if err := tx.Model(&models.TaskFee{}).Where("address IN (?)", addresses).Find(&existedTaskFees).Error; err != nil {
@@ -469,7 +500,16 @@ func processPendingWithdrawEvents(ctx context.Context, db *gorm.DB, events []mod
 			return err
 		}
 
-		if err := tx.Model(&models.WithdrawRecord{}).Where("id IN (?)", eventIDs).Where("local_status = ?", models.WithdrawLocalStatusPending).Update("local_status", models.WithdrawLocalStatusProcessed).Error; err != nil {
+		var macCases string
+		for address, mac := range eventMACs {
+			macCases += fmt.Sprintf(" WHEN address = '%s' THEN '%s'", address, mac)
+		}
+		updates := map[string]interface{}{
+			"mac": gorm.Expr("CASE" + macCases + " END"),
+			"local_status": models.WithdrawLocalStatusProcessed,
+		}
+
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id IN (?)", eventIDs).Where("local_status = ?", models.WithdrawLocalStatusPending).Updates(updates).Error; err != nil {
 			return err
 		}
 
