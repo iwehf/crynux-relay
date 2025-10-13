@@ -24,10 +24,11 @@ type GetTaskFeeLogsInputWithSignature struct {
 }
 
 type TaskFeeLog struct {
-	ID        uint   `json:"id"`
-	CreatedAt uint64 `json:"created_at"`
-	Address   string `json:"address"`
-	TaskFee   string `json:"task_fee"`
+	ID        uint                    `json:"id"`
+	CreatedAt uint64                  `json:"created_at"`
+	Address   string                  `json:"address"`
+	TaskFee   string                  `json:"task_fee"`
+	Type      models.TaskFeeEventType `json:"type"`
 }
 
 type GetTaskFeeLogsResponse struct {
@@ -81,6 +82,7 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 					CreatedAt: uint64(event.CreatedAt.Unix()),
 					Address:   event.Address,
 					TaskFee:   event.TaskFee.String(),
+					Type:      event.Type,
 				})
 			}
 		}
