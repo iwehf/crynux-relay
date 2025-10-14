@@ -133,7 +133,7 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Tran
 	}
 
 	// Check if already processed
-	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, tx.Hash().Hex())
+	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, tx.Hash().Hex(), client.Network)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Tran
 	}
 
 	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := BuyTaskQuota(ctx, db, tx.Hash().Hex(), from.Hex(), tx.Value(), client.Network)
+	commitFunc, err := buyTaskQuota(ctx, db, tx.Hash().Hex(), from.Hex(), tx.Value(), client.Network)
 	if err != nil {
 		log.Errorf("Failed to buy task quota for %s, network: %s, error: %v", from.Hex(), client.Network, err)
 		return err
