@@ -283,4 +283,8 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Get withdraw records"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetWithdrawRecords, 200))
+	clientGroup.GET("/:address/deposit/list", []fizz.OperationOption{
+		fizz.Summary("Get deposit records"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetDepositRecords, 200))
 }

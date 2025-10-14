@@ -330,8 +330,9 @@ func syncTaskQuotasToDB(ctx context.Context, db *gorm.DB) error {
 	}
 }
 
-func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
-
+func buyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	event := &models.TaskQuotaEvent{
 		Reason:        fmt.Sprintf("%d-%s-%s", models.TaskQuotaTypeBought, txHash, network),
 		Address:       address,
@@ -341,7 +342,7 @@ func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amou
 		TaskQuotaType: models.TaskQuotaTypeBought,
 	}
 
-	if err := db.Create(event).Error; err != nil {
+	if err := db.WithContext(dbCtx).Create(event).Error; err != nil {
 		return nil, err
 	}
 

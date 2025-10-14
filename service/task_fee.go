@@ -579,15 +579,31 @@ func syncTaskFeesToDB(ctx context.Context, db *gorm.DB) error {
 }
 
 func buyTaskFee(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
-	event := &models.TaskFeeEvent{
-		Address:   address,
-		TaskFee:   models.BigInt{Int: *new(big.Int).Set(amount)},
-		CreatedAt: time.Now(),
-		Status:    models.TaskFeeEventStatusPending,
-		Type:      models.TaskFeeEventTypeBought,
-		Reason:    fmt.Sprintf("%d-%s-%s", models.TaskFeeEventTypeBought, txHash, network),
-	}
-	if err := db.Create(event).Error; err != nil {
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
+		event := &models.TaskFeeEvent{
+			Address:   address,
+			TaskFee:   models.BigInt{Int: *new(big.Int).Set(amount)},
+			CreatedAt: time.Now(),
+			Status:    models.TaskFeeEventStatusPending,
+			Type:      models.TaskFeeEventTypeBought,
+			Reason:    fmt.Sprintf("%d-%s-%s", models.TaskFeeEventTypeBought, txHash, network),
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return err
+		}
+		depositRecord := &models.DepositRecord{
+			Address: address,
+			Amount:  models.BigInt{Int: *new(big.Int).Set(amount)},
+			Network: network,
+			TxHash:  txHash,
+		}
+		if err := tx.Create(depositRecord).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
