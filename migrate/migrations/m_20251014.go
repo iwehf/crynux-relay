@@ -1,9 +1,6 @@
 package migrations
 
 import (
-	"crynux_relay/models"
-	"strings"
-
 	"github.com/go-gormigrate/gormigrate/v2"
 	"gorm.io/gorm"
 )
@@ -22,28 +19,6 @@ func M20251014(db *gorm.DB) *gormigrate.Gormigrate {
 			ID: "M20251014",
 			Migrate: func(tx *gorm.DB) error {
 				if err := tx.Migrator().CreateTable(&DepositRecord{}); err != nil {
-					return err
-				}
-				events := []models.TaskFeeEvent{}
-				if err := tx.Model(&models.TaskFeeEvent{}).Where("type = ?", models.TaskFeeEventTypeBought).Find(&events).Error; err != nil {
-					return err
-				}
-				depositRecords := []DepositRecord{}
-				for _, event := range events {
-					parts := strings.Split(event.Reason, "-")
-					if len(parts) != 3 {
-						continue
-					}
-					txHash := parts[1]
-					network := parts[2]
-					depositRecords = append(depositRecords, DepositRecord{
-						Address: event.Address,
-						Amount: event.TaskFee.String(),
-						Network: network,
-						TxHash: txHash,
-					})
-				}
-				if err := tx.Create(&depositRecords).Error; err != nil {
 					return err
 				}
 				return nil
