@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"crynux_relay/blockchain"
-	"crynux_relay/config"
 	"crynux_relay/models"
 	"errors"
 	"fmt"
@@ -331,8 +330,9 @@ func syncTaskQuotasToDB(ctx context.Context, db *gorm.DB) error {
 	}
 }
 
-func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
-
+func buyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	event := &models.TaskQuotaEvent{
 		Reason:        fmt.Sprintf("%d-%s-%s", models.TaskQuotaTypeBought, txHash, network),
 		Address:       address,
@@ -342,7 +342,7 @@ func BuyTaskQuota(ctx context.Context, db *gorm.DB, txHash, address string, amou
 		TaskQuotaType: models.TaskQuotaTypeBought,
 	}
 
-	if err := db.Create(event).Error; err != nil {
+	if err := db.WithContext(dbCtx).Create(event).Error; err != nil {
 		return nil, err
 	}
 
@@ -430,163 +430,4 @@ func RefundTaskQuota(ctx context.Context, db *gorm.DB, taskIDCommitment, address
 
 func GetTaskQuota(ctx context.Context, db *gorm.DB, address string) (*big.Int, error) {
 	return getTaskQuotaFromCache(ctx, db, address)
-}
-
-// StartNativeTokenListener starts the native token transfer listener
-func StartNativeTokenListener(ctx context.Context) {
-	appConfig := config.GetConfig()
-
-	// Start the listener goroutine
-	for network := range appConfig.Blockchains {
-		go func(network string) {
-			if err := runNativeTokenListener(ctx, config.GetDB(), network, appConfig.Quota.Address); err != nil {
-				log.Errorf("Native token listener failed: %v", err)
-			}
-		}(network)
-	}
-
-	log.Info("Native token listener started")
-}
-
-// runNativeTokenListener runs the native token transfer listener
-func runNativeTokenListener(ctx context.Context, db *gorm.DB, network string, targetAddress string) error {
-	ticker := time.NewTicker(5 * time.Second) // Check for new blocks every 5 seconds
-	defer ticker.Stop()
-
-	client, err := blockchain.GetBlockchainClient(network)
-	if err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if err := processNewBlocks(ctx, db, client, targetAddress); err != nil {
-				log.Errorf("Failed to process new blocks: %v", err)
-			}
-		}
-	}
-}
-
-// processNewBlocks processes new blocks
-func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, targetAddress string) error {
-	// Get current block height
-	latestBlock, err := client.RpcClient.BlockByNumber(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get latest block: %w", err)
-	}
-
-	// Get listener status
-	listener, err := models.GetNativeTokenListener(ctx, db, client.Network)
-	if err != nil {
-		return err
-	}
-
-	// If already at the latest block, skip
-	if listener.LastBlockNum >= latestBlock.NumberU64() {
-		return nil
-	}
-
-	// Process new blocks
-	startBlock := listener.LastBlockNum + 1
-	endBlock := latestBlock.NumberU64()
-
-	// Limit the number of blocks processed each time to avoid long processing time
-	if endBlock-startBlock > 10 {
-		endBlock = startBlock + 10
-	}
-
-	log.Infof("Processing blocks from %d to %d", startBlock, endBlock)
-
-	for blockNum := startBlock; blockNum <= endBlock; blockNum++ {
-		if err := processBlock(ctx, db, client, blockNum, targetAddress); err != nil {
-			log.Errorf("Failed to process block %d: %v", blockNum, err)
-			continue
-		}
-	}
-
-	// Update listener status
-	if err := db.Model(&listener).Updates(map[string]interface{}{
-		"last_block_num":   endBlock,
-		"last_update_time": time.Now(),
-	}).Error; err != nil {
-		return fmt.Errorf("failed to update block listener: %w", err)
-	}
-
-	return nil
-}
-
-// processBlock processes a single block
-func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, blockNum uint64, targetAddress string) error {
-	block, err := client.RpcClient.BlockByNumber(ctx, big.NewInt(int64(blockNum)))
-	if err != nil {
-		return fmt.Errorf("failed to get block %d: %w", blockNum, err)
-	}
-
-	// Check transactions in the block
-	for _, tx := range block.Transactions() {
-		if err := processTransaction(ctx, db, tx, client, targetAddress); err != nil {
-			log.Errorf("Failed to process transaction %s: %v", tx.Hash().Hex(), err)
-			continue
-		}
-	}
-
-	return nil
-}
-
-// processTransaction processes a single transaction
-func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient, targetAddress string) error {
-	// Only process native token transfers (to field is not empty and data field is empty)
-	if tx.To() == nil || len(tx.Data()) > 0 {
-		return nil
-	}
-
-	// Check if transfer is to the target address
-	if !strings.EqualFold(tx.To().Hex(), targetAddress) {
-		return nil
-	}
-
-	// Check if transaction is successful
-	receipt, err := client.RpcClient.TransactionReceipt(ctx, tx.Hash())
-	if err != nil {
-		return fmt.Errorf("failed to get transaction receipt: %w", err)
-	}
-
-	if receipt.Status != types.ReceiptStatusSuccessful {
-		return nil
-	}
-
-	// Check if already processed
-	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, tx.Hash().Hex())
-	if err != nil {
-		return err
-	}
-	if event != nil {
-		return nil
-	}
-
-	// Get sender address (need to recover from signature)
-	from, err := types.Sender(types.NewEIP155Signer(client.ChainID), tx)
-	if err != nil {
-		return fmt.Errorf("failed to get sender address: %w", err)
-	}
-
-	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := BuyTaskQuota(ctx, db, tx.Hash().Hex(), from.Hex(), tx.Value(), client.Network)
-	if err != nil {
-		log.Errorf("Failed to buy task quota for %s: %v", from.Hex(), err)
-		return err
-	}
-
-	// Execute quota update
-	if err := commitFunc(); err != nil {
-		log.Errorf("Failed to buy task quota for %s: %v", from.Hex(), err)
-		return err
-	}
-
-	log.Infof("Processed native token transfer: %s -> %s, amount: %s", from.Hex(), tx.To().Hex(), tx.Value().String())
-
-	return nil
 }

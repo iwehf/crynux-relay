@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -17,6 +18,11 @@ type WithdrawRecord struct {
 	TaskFeeEventID uint                `json:"task_fee_event_id" gorm:"not null"`
 	TxHash         sql.NullString      `json:"tx_hash" gorm:"null;"`
 	WithdrawalFee  BigInt              `json:"withdrawal_fee" gorm:"not null"`
+	MAC            string              `json:"mac" gorm:"not null"`
+}
+
+func (r *WithdrawRecord) MACString() string {
+	return fmt.Sprintf("%d-%s-%s-%s-%s", r.ID, r.Address, r.BenefitAddress, (&r.Amount).String(), r.Network)
 }
 
 type WithdrawStatus int8

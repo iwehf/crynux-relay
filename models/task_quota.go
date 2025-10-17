@@ -41,11 +41,11 @@ type TaskQuotaEvent struct {
 	Reason        string               `json:"reason" gorm:"not null;uniqueIndex"`
 }
 
-func GetTaskQuotaBoughtEvent(ctx context.Context, db *gorm.DB, txHash string) (*TaskQuotaEvent, error) {
+func GetTaskQuotaBoughtEvent(ctx context.Context, db *gorm.DB, txHash, network string) (*TaskQuotaEvent, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var event TaskQuotaEvent
-	if err := db.WithContext(dbCtx).Where("reason = ?", fmt.Sprintf("%d-%s", TaskQuotaTypeBought, txHash)).First(&event).Error; err != nil {
+	if err := db.WithContext(dbCtx).Where("reason = ?", fmt.Sprintf("%d-%s-%s", TaskQuotaTypeBought, txHash, network)).First(&event).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

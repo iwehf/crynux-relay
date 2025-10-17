@@ -62,9 +62,9 @@ type AppConfig struct {
 			NodeStaking    string `mapstructure:"node_staking"`
 			Credits        string `mapstructure:"credits"`
 		} `mapstructure:"contracts"`
-		MaxRetries      uint8  `mapstructure:"max_retries"`
-		RetryInterval   uint64 `mapstructure:"retry_interval"`
-		ReceiptWaitTime uint64 `mapstructure:"receipt_wait_time"`
+		MaxRetries                uint8  `mapstructure:"max_retries"`
+		RetryInterval             uint64 `mapstructure:"retry_interval"`
+		ReceiptWaitTime           uint64 `mapstructure:"receipt_wait_time"`
 		SentTransactionCountLimit uint64 `mapstructure:"sent_transaction_count_limit"`
 	} `mapstructure:"blockchains"`
 
@@ -95,7 +95,16 @@ type AppConfig struct {
 		Percent uint64 `mapstructure:"percent"`
 	} `mapstructure:"dao"`
 
-	Quota struct {
+	BuyQuota struct {
 		Address string `mapstructure:"address"`
-	} `mapstructure:"quota"`
+	} `mapstructure:"buy_quota"`
+
+	BuyTaskFee struct {
+		Address string `mapstructure:"address"`
+	} `mapstructure:"buy_task_fee"`
+
+	MAC struct {
+		SecretKey     string `mapstructure:"secret_key"`
+		SecretKeyFile string `mapstructure:"secret_key_file"`
+	} `mapstructure:"mac"`
 }
