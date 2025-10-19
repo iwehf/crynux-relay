@@ -54,7 +54,7 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
-	if err := config.GetDB().WithContext(dbCtx).Model(&models.TaskFeeEvent{}).Where("id > ?", in.StartID).Order("id ASC").Limit(in.Limit).Find(&events).Error; err != nil {
+	if err := config.GetDB().WithContext(dbCtx).Model(&models.TaskFeeEvent{}).Where("id > ?", in.StartID).Where("status != ?", models.TaskFeeEventStatusInvalid).Order("id ASC").Limit(in.Limit).Find(&events).Error; err != nil {
 		return nil, err
 	}
 
