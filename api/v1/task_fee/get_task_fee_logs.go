@@ -61,15 +61,12 @@ func GetTaskFeeLogs(c *gin.Context, in *GetTaskFeeLogsInputWithSignature) (*GetT
 	// Filter out events with non-consecutive IDs
 	logs := make([]TaskFeeLog, 0, len(events))
 	if len(events) > 0 {
-		lastID := events[0].ID
 		appConfig := config.GetConfig()
 		invalidIDs := make([]uint, 0)
-		for i, event := range events {
-			if event.Status == models.TaskFeeEventStatusPending || (i > 0 && event.ID != lastID+1) {
+		for _, event := range events {
+			if event.Status == models.TaskFeeEventStatusPending {
 				break
 			}
-
-			lastID = event.ID
 
 			if event.Status == models.TaskFeeEventStatusProcessed {
 				valid := utils.VerifyMAC([]byte(event.Reason), appConfig.MAC.SecretKey, event.MAC)
