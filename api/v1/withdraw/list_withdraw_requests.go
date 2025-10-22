@@ -58,21 +58,18 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
-	if err := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id > ?", in.StartID).Order("id ASC").Limit(in.Limit).Find(&records).Error; err != nil {
+	if err := config.GetDB().WithContext(dbCtx).Model(&models.WithdrawRecord{}).Where("id > ?", in.StartID).Where("local_status != ?", models.WithdrawLocalStatusInvalid).Order("id ASC").Limit(in.Limit).Find(&records).Error; err != nil {
 		return nil, err
 	}
 
 	results := make([]WithdrawRecord, 0, len(records))
 	if len(records) > 0 {
-		lastID := records[0].ID
 		appConfig := config.GetConfig()
 		invalidIDs := make([]uint, 0)
-		for i, record := range records {
-			if record.LocalStatus == models.WithdrawLocalStatusPending || (i > 0 && record.ID != lastID+1) {
+		for _, record := range records {
+			if record.LocalStatus == models.WithdrawLocalStatusPending {
 				break
 			}
-
-			lastID = record.ID
 
 			if record.LocalStatus == models.WithdrawLocalStatusProcessed {
 				valid := utils.VerifyMAC([]byte(record.MACString()), appConfig.MAC.SecretKey, record.MAC)
