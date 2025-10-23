@@ -74,6 +74,7 @@ func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.Block
 	}
 
 	// Process new blocks
+	processedBlock := listener.LastBlockNum
 	startBlock := listener.LastBlockNum + 1
 	endBlock := latestBlock.NumberU64()
 
@@ -87,13 +88,14 @@ func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.Block
 	for blockNum := startBlock; blockNum <= endBlock; blockNum++ {
 		if err := processBlock(ctx, db, client, blockNum); err != nil {
 			log.Errorf("Failed to process block %d: %v", blockNum, err)
-			continue
+			break
 		}
+		processedBlock = blockNum
 	}
 
 	// Update listener status
 	if err := db.Model(&listener).Updates(map[string]interface{}{
-		"last_block_num":   endBlock,
+		"last_block_num":   processedBlock,
 		"last_update_time": time.Now(),
 	}).Error; err != nil {
 		return fmt.Errorf("failed to update block listener: %w", err)
@@ -113,7 +115,7 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 	for _, tx := range block.Transactions() {
 		if err := processTransaction(ctx, db, tx, client); err != nil {
 			log.Errorf("Failed to process transaction %s: %v", tx.Hash().Hex(), err)
-			continue
+			return err
 		}
 	}
 
