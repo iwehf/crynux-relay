@@ -1,17 +1,17 @@
 package nodes
 
 import (
+	"context"
 	"crynux_relay/api/v1/response"
 	"crynux_relay/api/v1/validate"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 type UpdateVersionInput struct {
@@ -42,19 +42,6 @@ func UpdateNodeVersion(c *gin.Context, in *UpdateVersionInputWithSignature) (*re
 		return nil, response.NewValidationErrorResponse("signature", "Signer not allowed")
 	}
 
-	node, err := models.GetNodeByAddress(c.Request.Context(), config.GetDB(), in.Address)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			validationErr := response.NewValidationErrorResponse("address", "Node not found")
-			return nil, validationErr
-		}
-		return nil, response.NewExceptionResponse(err)
-	}
-
-	if node.Status == models.NodeStatusQuit {
-		return nil, response.NewValidationErrorResponse("address", "Illegal node status")
-	}
-
 	versions := strings.Split(in.Version, ".")
 	if len(versions) != 3 {
 		return nil, response.NewValidationErrorResponse("version", "Invalid node version")
@@ -68,8 +55,15 @@ func UpdateNodeVersion(c *gin.Context, in *UpdateVersionInputWithSignature) (*re
 		}
 	}
 
-	if err := node.Update(c.Request.Context(), config.GetDB(), map[string]interface{}{"major_version": nodeVersions[0], "minor_version": nodeVersions[1], "patch_version": nodeVersions[2]}); err != nil {
-		return nil, response.NewExceptionResponse(err)
+	dbCtx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	res := config.GetDB().WithContext(dbCtx).Model(&models.Node{}).Where("address = ?", in.Address).Updates(map[string]interface{}{"major_version": nodeVersions[0], "minor_version": nodeVersions[1], "patch_version": nodeVersions[2]})
+	if res.Error != nil {
+		return nil, response.NewExceptionResponse(res.Error)
 	}
+	if res.RowsAffected == 0 {
+		return nil, response.NewValidationErrorResponse("address", "Node not found")
+	}
+	
 	return &response.Response{}, nil
 }

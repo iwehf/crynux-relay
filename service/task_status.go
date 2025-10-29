@@ -36,6 +36,11 @@ func CreateTask(ctx context.Context, db *gorm.DB, task *models.InferenceTask) er
 	})
 }
 
+func isNodeVersionValidForTask(node *models.Node, task *models.InferenceTask) bool {
+	taskVersionNumbers := task.VersionNumbers()
+	return node.MajorVersion == taskVersionNumbers[0] && (node.MinorVersion > taskVersionNumbers[1] || (node.MinorVersion == taskVersionNumbers[1] && node.PatchVersion >= taskVersionNumbers[2]))
+}
+
 func SetTaskStatusStarted(ctx context.Context, db *gorm.DB, originTask *models.InferenceTask, originNode *models.Node) error {
 	task := *originTask
 	node := *originNode
@@ -43,6 +48,13 @@ func SetTaskStatusStarted(ctx context.Context, db *gorm.DB, originTask *models.I
 	if task.Status != models.TaskQueued {
 		return errWrongTaskStatus
 	}
+	if err := node.Sync(ctx, db); err != nil {
+		return err
+	}
+	if !isNodeVersionValidForTask(&node, &task) {
+		return errors.New("node version is not compatible with task")
+	}
+
 	var inUseModelIDs []string
 	for _, model := range node.Models {
 		if model.InUse {

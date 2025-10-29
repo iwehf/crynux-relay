@@ -72,6 +72,15 @@ func (node *Node) Update(ctx context.Context, db *gorm.DB, values map[string]int
 	return nil
 }
 
+func (node *Node) Sync(ctx context.Context, db *gorm.DB) error {
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := db.WithContext(dbCtx).Model(node).First(node).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 func (node *Node) SyncStatus(ctx context.Context, db *gorm.DB) error {
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
