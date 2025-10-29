@@ -42,6 +42,7 @@ type AppConfig struct {
 
 	DataDir struct {
 		InferenceTasks string `mapstructure:"inference_tasks"`
+		SlashedTasks string `mapstructure:"slashed_tasks"`
 	} `mapstructure:"data_dir"`
 
 	Blockchains map[string]struct {

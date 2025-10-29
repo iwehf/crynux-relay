@@ -109,11 +109,31 @@ func UploadResult(c *gin.Context, in *ResultInputWithSignature) (*response.Respo
 		return nil, validationErr
 	}
 
+	taskGroup, err := models.GetTaskGroupByTaskID(c.Request.Context(), config.GetDB(), task.TaskID)
+	if err != nil {
+		return nil, response.NewExceptionResponse(err)
+	}
+	isSlashed := false
+	if len(taskGroup) > 1 {
+		for _, t := range taskGroup {
+			if t.Status == models.TaskEndInvalidated {
+				isSlashed = true
+				break
+			}
+		}
+	}
+
 	appConfig := config.GetConfig()
 
 	taskDir := filepath.Join(appConfig.DataDir.InferenceTasks, task.TaskIDCommitment, "results")
 	if err = os.MkdirAll(taskDir, 0o711); err != nil {
 		return nil, response.NewExceptionResponse(err)
+	}
+	slashedTaskDir := filepath.Join(appConfig.DataDir.SlashedTasks, task.TaskIDCommitment, "results")
+	if isSlashed {
+		if err = os.MkdirAll(slashedTaskDir, 0o711); err != nil {
+			return nil, response.NewExceptionResponse(err)
+		}
 	}
 
 	var fileExt string
@@ -127,6 +147,12 @@ func UploadResult(c *gin.Context, in *ResultInputWithSignature) (*response.Respo
 		filename := filepath.Join(taskDir, strconv.Itoa(i)+fileExt)
 		if err := c.SaveUploadedFile(file, filename); err != nil {
 			return nil, response.NewExceptionResponse(err)
+		}
+		if isSlashed {
+			slashedFilename := filepath.Join(slashedTaskDir, strconv.Itoa(i)+fileExt)
+			if err := c.SaveUploadedFile(file, slashedFilename); err != nil {
+				return nil, response.NewExceptionResponse(err)
+			}
 		}
 	}
 
@@ -144,6 +170,12 @@ func UploadResult(c *gin.Context, in *ResultInputWithSignature) (*response.Respo
 		checkpointFilename := filepath.Join(taskDir, "checkpoint.zip")
 		if err := c.SaveUploadedFile(checkpoint, checkpointFilename); err != nil {
 			return nil, response.NewExceptionResponse(err)
+		}
+		if isSlashed {
+			slashedCheckpointFilename := filepath.Join(slashedTaskDir, "checkpoint.zip")
+			if err := c.SaveUploadedFile(checkpoint, slashedCheckpointFilename); err != nil {
+				return nil, response.NewExceptionResponse(err)
+			}
 		}
 	}
 	for range 3 {
