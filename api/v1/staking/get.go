@@ -4,6 +4,7 @@ import (
 	"crynux_relay/api/v1/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/service"
 	"errors"
 	"math/big"
 
@@ -33,5 +34,12 @@ func GetStaking(c *gin.Context, in *GetStakingInput) (*GetStakingOutput, error) 
 
 	return &GetStakingOutput{
 		Data: node.StakeAmount,
+	}, nil
+}
+
+func GetUserStakingOfNode(c *gin.Context, in *GetStakingInput) (*GetStakingOutput, error) {
+	amount := service.GetUserStakeAmountOfNode(in.Address)
+	return &GetStakingOutput{
+		Data: models.BigInt{Int: *amount},
 	}, nil
 }

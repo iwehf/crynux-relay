@@ -126,6 +126,12 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(staking.GetStaking, 200))
 
+	userStakingGroup := v1g.Group("user_staking", "user_staking", "user staking related APIs")
+	userStakingGroup.GET("/node/:address", []fizz.OperationOption{
+		fizz.Summary("Get user staking of node"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(staking.GetUserStakingOfNode, 200))
+
 	eventsGroup := v1g.Group("events", "events", "events related APIs")
 	eventsGroup.GET("", []fizz.OperationOption{
 		fizz.Summary("Get events"),
