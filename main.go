@@ -51,11 +51,8 @@ func main() {
 	
 	tm := blockchain.NewTransactionManager(config.GetDB())
 	tm.Start(context.Background())
-	
-	stakingUpdater := service.NewStakeAmountUpdater(config.GetDB())
-	stakingUpdater.Start(context.Background())
-	
-	service.StartNativeTokenListener(context.Background())
+		
+	service.StartBlockListener(context.Background())
 	go service.StartTaskProcesser(context.Background())
 	go service.StartTaskQuotaSync(context.Background(), config.GetDB())
 	go service.StartTaskFeeSync(context.Background(), config.GetDB())

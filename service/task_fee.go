@@ -109,7 +109,7 @@ func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mod
 			invalidEvents = append(invalidEvents, event)
 			continue
 		}
-		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw {
+		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw || event.Type == models.TaskFeeEventTypeUserCommission {
 			taskIDCommitment := reasons[1]
 			if _, ok := taskIDCommitmentMap[taskIDCommitment]; !ok {
 				taskIDCommitmentMap[taskIDCommitment] = struct{}{}
@@ -192,7 +192,7 @@ func validatePendingTaskFeeEvents(ctx context.Context, db *gorm.DB, events []mod
 	validEvents := make([]models.TaskFeeEvent, 0)
 	for _, event := range candidateEvents {
 		reasons := strings.Split(event.Reason, "-")
-		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw {
+		if event.Type == models.TaskFeeEventTypeTask || event.Type == models.TaskFeeEventTypeDraw || event.Type == models.TaskFeeEventTypeUserCommission {
 			taskIDCommitment := reasons[1]
 			if task, exists := taskMap[taskIDCommitment]; exists {
 				if task.Status == models.TaskValidated || task.Status == models.TaskGroupValidated {
@@ -628,6 +628,13 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	daoFee.Div(daoFee, big.NewInt(100))
 
 	reward := big.NewInt(0).Sub(amount, daoFee)
+	totalCommissionFee := big.NewInt(0)
+	commissionRate := GetCommissionRate(address)
+	if commissionRate > 0 {
+		totalCommissionFee := totalCommissionFee.Mul(reward, big.NewInt(int64(commissionRate)))
+		totalCommissionFee.Div(totalCommissionFee, big.NewInt(100))
+		reward = reward.Sub(reward, totalCommissionFee)
+	}
 
 	rewardEvent := &models.TaskFeeEvent{
 		Address:   address,
@@ -647,6 +654,32 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	}
 	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
 
+	if totalCommissionFee.Sign() > 0 {
+		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address)
+		userAddresses := make([]string, 0, len(userStakings))
+		userCommissionFees := make([]*big.Int, 0, len(userStakings))
+		dispatchedCommissionFee := big.NewInt(0)
+		for userAddress, userStakingAmount := range userStakings {
+			userAddresses = append(userAddresses, userAddress)
+			commissionFee := big.NewInt(0).Mul(totalCommissionFee, userStakingAmount)
+			commissionFee = commissionFee.Div(commissionFee, totalUserStakeAmount)
+			userCommissionFees = append(userCommissionFees, commissionFee)
+			dispatchedCommissionFee = dispatchedCommissionFee.Add(dispatchedCommissionFee, commissionFee)
+		}
+		userCommissionFees[0].Add(userCommissionFees[0], big.NewInt(0).Sub(totalCommissionFee, dispatchedCommissionFee))
+
+		for i := range len(userStakings) {
+			events = append(events, &models.TaskFeeEvent{
+				Address: userAddresses[i],
+				TaskFee: models.BigInt{Int: *userCommissionFees[i]},
+				CreatedAt: time.Now(),
+				Status: models.TaskFeeEventStatusPending,
+				Type: models.TaskFeeEventTypeUserCommission,
+				Reason: fmt.Sprintf("%d-%s", models.TaskFeeEventTypeUserCommission, taskIDCommitment),
+			})
+		}
+	}
+
 	if err := db.Create(events).Error; err != nil {
 		return nil, err
 	}
@@ -656,19 +689,20 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 		return nil, err
 	}
 
-	nodeTaskFee, err := getTaskFeeFromCache(ctx, db, address)
-	if err != nil {
-		return nil, err
-	}
-	daoTaskFee, err := getTaskFeeFromCache(ctx, db, appConfig.Dao.Address)
-	if err != nil {
-		return nil, err
+	taskFees := make([]*big.Int, 0, len(events))
+	for _, event := range events {
+		fee, err := getTaskFeeFromCache(ctx, db, event.Address)
+		if err != nil {
+			return nil, err
+		}
+		taskFees = append(taskFees, fee)
 	}
 	commitFunc := func() error {
 		taskFeeCache.mu.Lock()
 		defer taskFeeCache.mu.Unlock()
-		nodeTaskFee.Add(nodeTaskFee, reward)
-		daoTaskFee.Add(daoTaskFee, daoFee)
+		for i := range len(events) {
+			taskFees[i].Add(taskFees[i], &events[i].TaskFee.Int)
+		}
 		return nil
 	}
 

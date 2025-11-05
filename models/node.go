@@ -35,6 +35,7 @@ type Node struct {
 	PatchVersion            uint64         `json:"patch_version"`
 	JoinTime                time.Time      `json:"join_time"`
 	StakeAmount             BigInt         `json:"stake_amount"`
+	CommissionRate          uint8          `json:"commission_rate"`
 	CurrentTaskIDCommitment sql.NullString `json:"current_task_id_commitment" gorm:"null;default:null"`
 	CurrentTask             InferenceTask  `json:"-" gorm:"foreignKey:TaskIDCommitment;references:CurrentTaskIDCommitment"`
 	Models                  []NodeModel    `json:"-" gorm:"foreignKey:NodeAddress;references:Address"`
