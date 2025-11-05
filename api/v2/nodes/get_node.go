@@ -7,6 +7,7 @@ import (
 	"crynux_relay/service"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -55,7 +56,11 @@ func GetNode(c *gin.Context, input *GetNodeInput) (*NodeResponse, error) {
 	nodeVersion := fmt.Sprintf("%d.%d.%d", node.MajorVersion, node.MinorVersion, node.PatchVersion)
 
 	qos := service.CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
-	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(&node.StakeAmount.Int, service.GetMaxStaking(), qos)
+	totalStakeAmount := big.NewInt(0)
+	if node.Status != models.NodeStatusQuit {
+		totalStakeAmount = new(big.Int).Add(&node.StakeAmount.Int, service.GetUserStakeAmountOfNode(node.Address))
+	}
+	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(totalStakeAmount, service.GetMaxStaking(), qos)
 
 	return &NodeResponse{
 		Data: &Node{
