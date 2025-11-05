@@ -35,6 +35,7 @@ type BlockchainClient struct {
 	BenefitAddressContractInstance *bindings.BenefitAddress
 	NodeStakingContractInstance    *bindings.NodeStaking
 	CreditsContractInstance        *bindings.Credits
+	UserStakingContractInstance    *bindings.UserStaking
 	ChainID                        *big.Int
 	GasPrice                       *big.Int
 	GasLimit                       uint64
@@ -85,6 +86,11 @@ func initBlockchainClient(ctx context.Context, network string) error {
 		return err
 	}
 
+	userStakingInstance, err := bindings.NewUserStaking(common.HexToAddress(blockchain.Contracts.UserStaking), client)
+	if err != nil {
+		return err
+	}
+
 	gasPrice, err := initSuggestGasPrice(ctx, client, blockchain.GasPrice)
 	if err != nil {
 		return err
@@ -109,6 +115,7 @@ func initBlockchainClient(ctx context.Context, network string) error {
 		BenefitAddressContractInstance: benefitAddressInstance,
 		NodeStakingContractInstance:    nodeStakingInstance,
 		CreditsContractInstance:        creditsInstance,
+		UserStakingContractInstance:    userStakingInstance,
 		ChainID:                        chainID,
 		GasPrice:                       gasPrice,
 		GasLimit:                       blockchain.GasLimit,

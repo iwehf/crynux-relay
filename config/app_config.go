@@ -71,6 +71,7 @@ type AppConfig struct {
 			BenefitAddress string `mapstructure:"benefit_address"`
 			NodeStaking    string `mapstructure:"node_staking"`
 			Credits        string `mapstructure:"credits"`
+			UserStaking    string `mapstructure:"user_staking"`
 		} `mapstructure:"contracts"`
 		MaxRetries                uint8  `mapstructure:"max_retries"`
 		RetryInterval             uint64 `mapstructure:"retry_interval"`
