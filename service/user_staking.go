@@ -113,6 +113,17 @@ func (c *userStakingCache) getUserStakingsOfNode(nodeAddress string) (map[string
 	}
 }
 
+func (c *userStakingCache) getDelegatorCountOfNode(nodeAddress string) int {
+	c.RLock()
+	defer c.RUnlock()
+
+	if userStakings, ok := c.nodeUserStakings[nodeAddress]; ok {
+		return len(userStakings)
+	} else {
+		return 0
+	}
+}
+
 func InitUserStakingCache(ctx context.Context, db *gorm.DB) error {
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -150,4 +161,8 @@ func GetUserStakeAmountOfNode(nodeAddress, network string) *big.Int {
 
 func GetUserStakingsOfNode(nodeAddress, network string) (map[string]*big.Int, *big.Int) {
 	return globalUserStakingCaches[network].getUserStakingsOfNode(nodeAddress)
+}
+
+func GetDelegatorCountOfNode(nodeAddress, network string) int {
+	return globalUserStakingCaches[network].getDelegatorCountOfNode(nodeAddress)
 }

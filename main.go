@@ -65,6 +65,9 @@ func main() {
 	go tasks.StartStatsTaskExecutionTimeCount(context.Background())
 	go tasks.StartStatsTaskUploadResultTimeCount(context.Background())
 	go tasks.StartStatsTaskWaitingTimeCount(context.Background())
+	go tasks.StartStatsNodeScores(context.Background())
+	go tasks.StartStatsNodeStakings(context.Background())
+	go tasks.StartStatsNodeDelegatorCount(context.Background())
 
 	startServer()
 }

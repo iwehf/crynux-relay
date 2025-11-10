@@ -628,10 +628,10 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	daoFee.Div(daoFee, big.NewInt(100))
 
 	reward := big.NewInt(0).Sub(amount, daoFee)
-	totalCommissionFee := big.NewInt(0)
+	totalDelegatorFee := big.NewInt(0)
 	delegatorShare := GetDelegatorShare(address)
 	if delegatorShare > 0 {
-		totalCommissionFee := totalCommissionFee.Mul(reward, big.NewInt(int64(delegatorShare)))
+		totalCommissionFee := totalDelegatorFee.Mul(reward, big.NewInt(int64(delegatorShare)))
 		totalCommissionFee.Div(totalCommissionFee, big.NewInt(100))
 		reward = reward.Sub(reward, totalCommissionFee)
 	}
@@ -654,33 +654,40 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	}
 	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
 
-	if totalCommissionFee.Sign() > 0 {
+	if totalDelegatorFee.Sign() > 0 {
 		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address, network)
 		userAddresses := make([]string, 0, len(userStakings))
-		userCommissionFees := make([]*big.Int, 0, len(userStakings))
+		userDelegatorFees := make([]*big.Int, 0, len(userStakings))
 		dispatchedCommissionFee := big.NewInt(0)
 		for userAddress, userStakingAmount := range userStakings {
 			userAddresses = append(userAddresses, userAddress)
-			commissionFee := big.NewInt(0).Mul(totalCommissionFee, userStakingAmount)
-			commissionFee = commissionFee.Div(commissionFee, totalUserStakeAmount)
-			userCommissionFees = append(userCommissionFees, commissionFee)
-			dispatchedCommissionFee = dispatchedCommissionFee.Add(dispatchedCommissionFee, commissionFee)
+			delegatorFee := big.NewInt(0).Mul(totalDelegatorFee, userStakingAmount)
+			delegatorFee = delegatorFee.Div(delegatorFee, totalUserStakeAmount)
+			userDelegatorFees = append(userDelegatorFees, delegatorFee)
+			dispatchedCommissionFee = dispatchedCommissionFee.Add(dispatchedCommissionFee, delegatorFee)
 		}
-		userCommissionFees[0].Add(userCommissionFees[0], big.NewInt(0).Sub(totalCommissionFee, dispatchedCommissionFee))
+		userDelegatorFees[0].Add(userDelegatorFees[0], big.NewInt(0).Sub(totalDelegatorFee, dispatchedCommissionFee))
 
 		for i := range len(userStakings) {
 			events = append(events, &models.TaskFeeEvent{
 				Address:   userAddresses[i],
-				TaskFee:   models.BigInt{Int: *userCommissionFees[i]},
+				TaskFee:   models.BigInt{Int: *userDelegatorFees[i]},
 				CreatedAt: time.Now(),
 				Status:    models.TaskFeeEventStatusPending,
 				Type:      models.TaskFeeEventTypeUserCommission,
 				Reason:    fmt.Sprintf("%d-%s", models.TaskFeeEventTypeUserCommission, taskIDCommitment),
 			})
+			if err := addUserStakingEarning(ctx, db, userAddresses[i], address, userDelegatorFees[i]); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	if err := db.Create(events).Error; err != nil {
+		return nil, err
+	}
+
+	if err := addNodeEarning(ctx, db, address, reward, totalDelegatorFee); err != nil {
 		return nil, err
 	}
 
