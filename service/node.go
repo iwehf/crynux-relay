@@ -23,9 +23,9 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 	if stakingAmount.Cmp(&node.StakeAmount.Int) != 0 {
 		return errors.New("staking amount mismatch")
 	}
-	userStakingAmount := GetUserStakeAmountOfNode(node.Address)
+	userStakingAmount := GetUserStakeAmountOfNode(node.Address, node.Network)
 	totalStakingAmount := big.NewInt(0).Add(stakingAmount, userStakingAmount)
-	commissionRate, err := blockchain.GetNodeCommissionRate(ctx, common.HexToAddress(node.Address), node.Network)
+	delegatorShare, err := blockchain.GetNodeDelegatorShare(ctx, common.HexToAddress(node.Address), node.Network)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 	err = db.Transaction(func(tx *gorm.DB) error {
 		node.Status = models.NodeStatusAvailable
 		node.JoinTime = time.Now()
-		node.CommissionRate = commissionRate
+		node.DelegatorShare = delegatorShare
 		if err := node.Save(ctx, tx); err != nil {
 			return err
 		}

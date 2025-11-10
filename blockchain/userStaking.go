@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func GetNodeCommissionRate(ctx context.Context, nodeAddress common.Address, network string) (uint8, error) {
+func GetNodeDelegatorShare(ctx context.Context, nodeAddress common.Address, network string) (uint8, error) {
 	client, err := GetBlockchainClient(network)
 	if err != nil {
 		return 0, err
@@ -22,7 +22,7 @@ func GetNodeCommissionRate(ctx context.Context, nodeAddress common.Address, netw
 		Pending: false,
 		Context: callCtx,
 	}
-	return client.UserStakingContractInstance.GetNodeCommissionRate(opts, nodeAddress)
+	return client.UserStakingContractInstance.GetNodeDelegatorShare(opts, nodeAddress)
 }
 
 func GetUserStakeAmountOfNode(ctx context.Context, nodeAddress common.Address, network string) (*big.Int, error) {

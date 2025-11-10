@@ -221,7 +221,7 @@ func processNodeStakingTransaction(ctx context.Context, db *gorm.DB, tx *types.T
 		if err != nil {
 			continue
 		}
-		if err := updateNodeStaking(ctx, db, event); err != nil {
+		if err := updateNodeStaking(ctx, db, event, client.Network); err != nil {
 			return err
 		}
 	}
@@ -229,7 +229,7 @@ func processNodeStakingTransaction(ctx context.Context, db *gorm.DB, tx *types.T
 	return nil
 }
 
-func updateNodeStaking(ctx context.Context, db *gorm.DB, event *bindings.NodeStakingNodeStaked) error {
+func updateNodeStaking(ctx context.Context, db *gorm.DB, event *bindings.NodeStakingNodeStaked, network string) error {
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
@@ -256,7 +256,7 @@ func updateNodeStaking(ctx context.Context, db *gorm.DB, event *bindings.NodeSta
 	}
 
 	// Update value in memory
-	totalStakeAmount := new(big.Int).Add(stakingAmount, GetUserStakeAmountOfNode(address))
+	totalStakeAmount := new(big.Int).Add(stakingAmount, GetUserStakeAmountOfNode(address, network))
 	if totalStakeAmount.Sign() > 0 {
 		UpdateMaxStaking(address, totalStakeAmount)
 	}
@@ -279,25 +279,25 @@ func processUserStakingTransaction(ctx context.Context, db *gorm.DB, tx *types.T
 
 	for _, log := range receipt.Logs {
 		if event, err := client.UserStakingContractInstance.ParseUserStaked(*log); err == nil {
-			if err := updateUserStaking(ctx, db, event); err != nil {
+			if err := updateUserStaking(ctx, db, event, client.Network); err != nil {
 				return err
 			}
 			continue
 		}
 		if event, err := client.UserStakingContractInstance.ParseUserUnstaked(*log); err == nil {
-			if err := unstakeUserStaking(ctx, db, event); err != nil {
+			if err := unstakeUserStaking(ctx, db, event, client.Network); err != nil {
 				return err
 			}
 			continue
 		}
-		if event, err := client.UserStakingContractInstance.ParseNodeCommissionRateChanged(*log); err == nil {
-			if err := changeNodeCommissionRate(ctx, db, event); err != nil {
+		if event, err := client.UserStakingContractInstance.ParseNodeDelegatorShareChanged(*log); err == nil {
+			if err := changeNodeDelegatorShare(ctx, db, event, client.Network); err != nil {
 				return err
 			}
 			continue
 		}
 		if event, err := client.UserStakingContractInstance.ParseNodeSlashed(*log); err == nil {
-			if err := slashUserStakingOfNode(ctx, db, event); err != nil {
+			if err := slashUserStakingOfNode(ctx, db, event, client.Network); err != nil {
 				return err
 			}
 			continue
@@ -307,7 +307,7 @@ func processUserStakingTransaction(ctx context.Context, db *gorm.DB, tx *types.T
 	return nil
 }
 
-func updateUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserStakingUserStaked) error {
+func updateUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserStakingUserStaked, network string) error {
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
@@ -344,7 +344,7 @@ func updateUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSta
 		}); err != nil {
 			return err
 		}
-		UpdateUserStaking(userAddress, nodeAddress, event.Amount)
+		UpdateUserStaking(userAddress, nodeAddress, event.Amount, network)
 		return nil
 	}); err != nil {
 		log.Errorf("UpdateUserStaking: failed to update user staking %s -> %s: %v", userAddress, nodeAddress, err)
@@ -354,7 +354,7 @@ func updateUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSta
 	// Update value in memory
 	if node, err := models.GetNodeByAddress(ctx, db, nodeAddress); err == nil {
 		if node.Status != models.NodeStatusQuit {
-			totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(nodeAddress))
+			totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(nodeAddress, network))
 			if totalStakeAmount.Sign() > 0 {
 				UpdateMaxStaking(nodeAddress, totalStakeAmount)
 			}
@@ -368,7 +368,7 @@ func updateUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSta
 	return nil
 }
 
-func unstakeUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserStakingUserUnstaked) error {
+func unstakeUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserStakingUserUnstaked, network string) error {
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
@@ -396,7 +396,7 @@ func unstakeUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSt
 		}); err != nil {
 			return err
 		}
-		UnstakeUserStaking(userAddress, nodeAddress)
+		UnstakeUserStaking(userAddress, nodeAddress, network)
 		return nil
 	}); err != nil {
 		log.Errorf("UnstakeUserStaking: failed to unstake user staking %s -> %s: %v", userAddress, nodeAddress, err)
@@ -405,7 +405,7 @@ func unstakeUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSt
 
 	if node, err := models.GetNodeByAddress(ctx, db, nodeAddress); err == nil {
 		if node.Status != models.NodeStatusQuit {
-			totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(nodeAddress))
+			totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(nodeAddress, network))
 			if totalStakeAmount.Sign() > 0 {
 				UpdateMaxStaking(nodeAddress, totalStakeAmount)
 			}
@@ -419,49 +419,49 @@ func unstakeUserStaking(ctx context.Context, db *gorm.DB, event *bindings.UserSt
 	return nil
 }
 
-func changeNodeCommissionRate(ctx context.Context, db *gorm.DB, event *bindings.UserStakingNodeCommissionRateChanged) error {
+func changeNodeDelegatorShare(ctx context.Context, db *gorm.DB, event *bindings.UserStakingNodeDelegatorShareChanged, network string) error {
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
 	nodeAddress := event.NodeAddress.Hex()
-	rate := event.Rate
+	share := event.Share
 	if err := db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.Node{}).Where("address = ?", nodeAddress).Update("commission_rate", rate).Error; err != nil {
+		if err := tx.Model(&models.Node{}).Where("address = ?", nodeAddress).Update("delegator_share", share).Error; err != nil {
 			return err
 		}
-		if rate == 0 {
+		if share == 0 {
 			// delete all user stakings to this node
 			if err := tx.Model(&models.UserStaking{}).Where("node_address = ?", nodeAddress).Update("valid", false).Error; err != nil {
 				return err
 			}
-			RemoveNodeUserStaking(nodeAddress)
+			RemoveNodeUserStaking(nodeAddress, network)
 		}
-		if err := emitEvent(ctx, tx, &models.NodeCommissionRateChangedEvent{
+		if err := emitEvent(ctx, tx, &models.NodeDelegatorShareChangedEvent{
 			NodeAddress: nodeAddress,
-			Rate:        rate,
+			Share:       share,
 		}); err != nil {
 			return err
 		}
-		SetCommissionRate(nodeAddress, rate)
+		SetDelegatorShare(nodeAddress, share)
 		return nil
 	}); err != nil {
-		log.Errorf("ChangeNodeCommissionRate: failed to change commission rate of node %s: %v", nodeAddress, err)
+		log.Errorf("ChangeNodeDelegatorShare: failed to change delegator share of node %s: %v", nodeAddress, err)
 		return err
 	}
 
-	if rate == 0 {
+	if share == 0 {
 		if node, err := models.GetNodeByAddress(ctx, db, nodeAddress); err == nil {
 			if node.Status != models.NodeStatusQuit {
 				UpdateMaxStaking(nodeAddress, &node.StakeAmount.Int)
 			}
 		}
 	}
-	log.Infof("ChangeNodeCommissionRate: successfully change commission rate of node %s to %d",
-		nodeAddress, rate)
+	log.Infof("ChangeNodeDelegatorShare: successfully change delegator share of node %s to %d",
+		nodeAddress, share)
 	return nil
 }
 
-func slashUserStakingOfNode(ctx context.Context, db *gorm.DB, event *bindings.UserStakingNodeSlashed) error {
+func slashUserStakingOfNode(ctx context.Context, db *gorm.DB, event *bindings.UserStakingNodeSlashed, network string) error {
 	dbCtx, dbCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer dbCancel()
 
@@ -470,7 +470,7 @@ func slashUserStakingOfNode(ctx context.Context, db *gorm.DB, event *bindings.Us
 		if err := tx.Model(&models.UserStaking{}).Where("node_address = ?", nodeAddress).Update("valid", false).Error; err != nil {
 			return err
 		}
-		RemoveNodeUserStaking(nodeAddress)
+		RemoveNodeUserStaking(nodeAddress, network)
 		return nil
 	}); err != nil {
 		log.Errorf("SlashUserStakingOfNode: failed to slash user staking of node %s: %v", nodeAddress, err)

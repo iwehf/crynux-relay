@@ -336,18 +336,18 @@ func (e *UserUnstakingEvent) ToEvent() (*Event, error) {
 	}, nil
 }
 
-type NodeCommissionRateChangedEvent struct {
+type NodeDelegatorShareChangedEvent struct {
 	NodeAddress string `json:"node_address"`
-	Rate        uint8   `json:"rate"`
+	Share       uint8  `json:"share"`
 }
 
-func (e *NodeCommissionRateChangedEvent) ToEvent() (*Event, error) {
+func (e *NodeDelegatorShareChangedEvent) ToEvent() (*Event, error) {
 	bs, err := json.Marshal(e)
 	if err != nil {
 		return nil, err
 	}
 	return &Event{
-		Type:        "NodeCommissionRateChanged",
+		Type:        "NodeDelegatorShareChanged",
 		NodeAddress: e.NodeAddress,
 		Args:        string(bs),
 	}, nil

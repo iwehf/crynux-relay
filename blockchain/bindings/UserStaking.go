@@ -31,7 +31,7 @@ var (
 
 // UserStakingMetaData contains all meta data concerning the UserStaking contract.
 var UserStakingMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"rate\",\"type\":\"uint8\"}],\"name\":\"NodeCommissionRateChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"NodeSlashed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"UserStaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"UserUnstaked\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"getAllNodeAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllNodeCommissionRates\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint8[]\",\"name\":\"\",\"type\":\"uint8[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllUserAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMinStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeCommissionRate\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeStakingInfos\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"}],\"name\":\"getUserStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getUserStakingAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"}],\"name\":\"getUserStakingInfos\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"rate\",\"type\":\"uint8\"}],\"name\":\"setCommissionRate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"stakeAmount\",\"type\":\"uint256\"}],\"name\":\"setMinStakeAmount\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNodeStakingAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"slashNode\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"stake\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"unstake\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"share\",\"type\":\"uint8\"}],\"name\":\"NodeDelegatorShareChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"NodeSlashed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"UserStaked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"UserUnstaked\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"getAllNodeAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllNodeDelegatorShares\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint8[]\",\"name\":\"\",\"type\":\"uint8[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getAllUserAddresses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMinStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeDelegatorShare\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getNodeStakingInfos\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"}],\"name\":\"getUserStakeAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"getUserStakingAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"userAddress\",\"type\":\"address\"}],\"name\":\"getUserStakingInfos\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"share\",\"type\":\"uint8\"}],\"name\":\"setDelegatorShare\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"stakeAmount\",\"type\":\"uint256\"}],\"name\":\"setMinStakeAmount\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNodeStakingAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"slashNode\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"stake\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\"}],\"name\":\"unstake\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
 // UserStakingABI is the input ABI used to generate the binding from.
@@ -211,12 +211,12 @@ func (_UserStaking *UserStakingCallerSession) GetAllNodeAddresses() ([]common.Ad
 	return _UserStaking.Contract.GetAllNodeAddresses(&_UserStaking.CallOpts)
 }
 
-// GetAllNodeCommissionRates is a free data retrieval call binding the contract method 0x767ea748.
+// GetAllNodeDelegatorShares is a free data retrieval call binding the contract method 0x20b2074f.
 //
-// Solidity: function getAllNodeCommissionRates() view returns(address[], uint8[])
-func (_UserStaking *UserStakingCaller) GetAllNodeCommissionRates(opts *bind.CallOpts) ([]common.Address, []uint8, error) {
+// Solidity: function getAllNodeDelegatorShares() view returns(address[], uint8[])
+func (_UserStaking *UserStakingCaller) GetAllNodeDelegatorShares(opts *bind.CallOpts) ([]common.Address, []uint8, error) {
 	var out []interface{}
-	err := _UserStaking.contract.Call(opts, &out, "getAllNodeCommissionRates")
+	err := _UserStaking.contract.Call(opts, &out, "getAllNodeDelegatorShares")
 
 	if err != nil {
 		return *new([]common.Address), *new([]uint8), err
@@ -229,18 +229,18 @@ func (_UserStaking *UserStakingCaller) GetAllNodeCommissionRates(opts *bind.Call
 
 }
 
-// GetAllNodeCommissionRates is a free data retrieval call binding the contract method 0x767ea748.
+// GetAllNodeDelegatorShares is a free data retrieval call binding the contract method 0x20b2074f.
 //
-// Solidity: function getAllNodeCommissionRates() view returns(address[], uint8[])
-func (_UserStaking *UserStakingSession) GetAllNodeCommissionRates() ([]common.Address, []uint8, error) {
-	return _UserStaking.Contract.GetAllNodeCommissionRates(&_UserStaking.CallOpts)
+// Solidity: function getAllNodeDelegatorShares() view returns(address[], uint8[])
+func (_UserStaking *UserStakingSession) GetAllNodeDelegatorShares() ([]common.Address, []uint8, error) {
+	return _UserStaking.Contract.GetAllNodeDelegatorShares(&_UserStaking.CallOpts)
 }
 
-// GetAllNodeCommissionRates is a free data retrieval call binding the contract method 0x767ea748.
+// GetAllNodeDelegatorShares is a free data retrieval call binding the contract method 0x20b2074f.
 //
-// Solidity: function getAllNodeCommissionRates() view returns(address[], uint8[])
-func (_UserStaking *UserStakingCallerSession) GetAllNodeCommissionRates() ([]common.Address, []uint8, error) {
-	return _UserStaking.Contract.GetAllNodeCommissionRates(&_UserStaking.CallOpts)
+// Solidity: function getAllNodeDelegatorShares() view returns(address[], uint8[])
+func (_UserStaking *UserStakingCallerSession) GetAllNodeDelegatorShares() ([]common.Address, []uint8, error) {
+	return _UserStaking.Contract.GetAllNodeDelegatorShares(&_UserStaking.CallOpts)
 }
 
 // GetAllUserAddresses is a free data retrieval call binding the contract method 0x2f330023.
@@ -305,12 +305,12 @@ func (_UserStaking *UserStakingCallerSession) GetMinStakeAmount() (*big.Int, err
 	return _UserStaking.Contract.GetMinStakeAmount(&_UserStaking.CallOpts)
 }
 
-// GetNodeCommissionRate is a free data retrieval call binding the contract method 0xe7b35318.
+// GetNodeDelegatorShare is a free data retrieval call binding the contract method 0x343c7202.
 //
-// Solidity: function getNodeCommissionRate(address nodeAddress) view returns(uint8)
-func (_UserStaking *UserStakingCaller) GetNodeCommissionRate(opts *bind.CallOpts, nodeAddress common.Address) (uint8, error) {
+// Solidity: function getNodeDelegatorShare(address nodeAddress) view returns(uint8)
+func (_UserStaking *UserStakingCaller) GetNodeDelegatorShare(opts *bind.CallOpts, nodeAddress common.Address) (uint8, error) {
 	var out []interface{}
-	err := _UserStaking.contract.Call(opts, &out, "getNodeCommissionRate", nodeAddress)
+	err := _UserStaking.contract.Call(opts, &out, "getNodeDelegatorShare", nodeAddress)
 
 	if err != nil {
 		return *new(uint8), err
@@ -322,18 +322,18 @@ func (_UserStaking *UserStakingCaller) GetNodeCommissionRate(opts *bind.CallOpts
 
 }
 
-// GetNodeCommissionRate is a free data retrieval call binding the contract method 0xe7b35318.
+// GetNodeDelegatorShare is a free data retrieval call binding the contract method 0x343c7202.
 //
-// Solidity: function getNodeCommissionRate(address nodeAddress) view returns(uint8)
-func (_UserStaking *UserStakingSession) GetNodeCommissionRate(nodeAddress common.Address) (uint8, error) {
-	return _UserStaking.Contract.GetNodeCommissionRate(&_UserStaking.CallOpts, nodeAddress)
+// Solidity: function getNodeDelegatorShare(address nodeAddress) view returns(uint8)
+func (_UserStaking *UserStakingSession) GetNodeDelegatorShare(nodeAddress common.Address) (uint8, error) {
+	return _UserStaking.Contract.GetNodeDelegatorShare(&_UserStaking.CallOpts, nodeAddress)
 }
 
-// GetNodeCommissionRate is a free data retrieval call binding the contract method 0xe7b35318.
+// GetNodeDelegatorShare is a free data retrieval call binding the contract method 0x343c7202.
 //
-// Solidity: function getNodeCommissionRate(address nodeAddress) view returns(uint8)
-func (_UserStaking *UserStakingCallerSession) GetNodeCommissionRate(nodeAddress common.Address) (uint8, error) {
-	return _UserStaking.Contract.GetNodeCommissionRate(&_UserStaking.CallOpts, nodeAddress)
+// Solidity: function getNodeDelegatorShare(address nodeAddress) view returns(uint8)
+func (_UserStaking *UserStakingCallerSession) GetNodeDelegatorShare(nodeAddress common.Address) (uint8, error) {
+	return _UserStaking.Contract.GetNodeDelegatorShare(&_UserStaking.CallOpts, nodeAddress)
 }
 
 // GetNodeStakeAmount is a free data retrieval call binding the contract method 0x43e4b7dd.
@@ -545,25 +545,25 @@ func (_UserStaking *UserStakingTransactorSession) RenounceOwnership() (*types.Tr
 	return _UserStaking.Contract.RenounceOwnership(&_UserStaking.TransactOpts)
 }
 
-// SetCommissionRate is a paid mutator transaction binding the contract method 0x12dee489.
+// SetDelegatorShare is a paid mutator transaction binding the contract method 0x8a114c20.
 //
-// Solidity: function setCommissionRate(uint8 rate) returns()
-func (_UserStaking *UserStakingTransactor) SetCommissionRate(opts *bind.TransactOpts, rate uint8) (*types.Transaction, error) {
-	return _UserStaking.contract.Transact(opts, "setCommissionRate", rate)
+// Solidity: function setDelegatorShare(uint8 share) returns()
+func (_UserStaking *UserStakingTransactor) SetDelegatorShare(opts *bind.TransactOpts, share uint8) (*types.Transaction, error) {
+	return _UserStaking.contract.Transact(opts, "setDelegatorShare", share)
 }
 
-// SetCommissionRate is a paid mutator transaction binding the contract method 0x12dee489.
+// SetDelegatorShare is a paid mutator transaction binding the contract method 0x8a114c20.
 //
-// Solidity: function setCommissionRate(uint8 rate) returns()
-func (_UserStaking *UserStakingSession) SetCommissionRate(rate uint8) (*types.Transaction, error) {
-	return _UserStaking.Contract.SetCommissionRate(&_UserStaking.TransactOpts, rate)
+// Solidity: function setDelegatorShare(uint8 share) returns()
+func (_UserStaking *UserStakingSession) SetDelegatorShare(share uint8) (*types.Transaction, error) {
+	return _UserStaking.Contract.SetDelegatorShare(&_UserStaking.TransactOpts, share)
 }
 
-// SetCommissionRate is a paid mutator transaction binding the contract method 0x12dee489.
+// SetDelegatorShare is a paid mutator transaction binding the contract method 0x8a114c20.
 //
-// Solidity: function setCommissionRate(uint8 rate) returns()
-func (_UserStaking *UserStakingTransactorSession) SetCommissionRate(rate uint8) (*types.Transaction, error) {
-	return _UserStaking.Contract.SetCommissionRate(&_UserStaking.TransactOpts, rate)
+// Solidity: function setDelegatorShare(uint8 share) returns()
+func (_UserStaking *UserStakingTransactorSession) SetDelegatorShare(share uint8) (*types.Transaction, error) {
+	return _UserStaking.Contract.SetDelegatorShare(&_UserStaking.TransactOpts, share)
 }
 
 // SetMinStakeAmount is a paid mutator transaction binding the contract method 0xeb4af045.
@@ -692,9 +692,9 @@ func (_UserStaking *UserStakingTransactorSession) Unstake(nodeAddress common.Add
 	return _UserStaking.Contract.Unstake(&_UserStaking.TransactOpts, nodeAddress)
 }
 
-// UserStakingNodeCommissionRateChangedIterator is returned from FilterNodeCommissionRateChanged and is used to iterate over the raw logs and unpacked data for NodeCommissionRateChanged events raised by the UserStaking contract.
-type UserStakingNodeCommissionRateChangedIterator struct {
-	Event *UserStakingNodeCommissionRateChanged // Event containing the contract specifics and raw log
+// UserStakingNodeDelegatorShareChangedIterator is returned from FilterNodeDelegatorShareChanged and is used to iterate over the raw logs and unpacked data for NodeDelegatorShareChanged events raised by the UserStaking contract.
+type UserStakingNodeDelegatorShareChangedIterator struct {
+	Event *UserStakingNodeDelegatorShareChanged // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -708,7 +708,7 @@ type UserStakingNodeCommissionRateChangedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *UserStakingNodeCommissionRateChangedIterator) Next() bool {
+func (it *UserStakingNodeDelegatorShareChangedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -717,7 +717,7 @@ func (it *UserStakingNodeCommissionRateChangedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(UserStakingNodeCommissionRateChanged)
+			it.Event = new(UserStakingNodeDelegatorShareChanged)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -732,7 +732,7 @@ func (it *UserStakingNodeCommissionRateChangedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(UserStakingNodeCommissionRateChanged)
+		it.Event = new(UserStakingNodeDelegatorShareChanged)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -748,52 +748,52 @@ func (it *UserStakingNodeCommissionRateChangedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *UserStakingNodeCommissionRateChangedIterator) Error() error {
+func (it *UserStakingNodeDelegatorShareChangedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *UserStakingNodeCommissionRateChangedIterator) Close() error {
+func (it *UserStakingNodeDelegatorShareChangedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// UserStakingNodeCommissionRateChanged represents a NodeCommissionRateChanged event raised by the UserStaking contract.
-type UserStakingNodeCommissionRateChanged struct {
+// UserStakingNodeDelegatorShareChanged represents a NodeDelegatorShareChanged event raised by the UserStaking contract.
+type UserStakingNodeDelegatorShareChanged struct {
 	NodeAddress common.Address
-	Rate        uint8
+	Share       uint8
 	Raw         types.Log // Blockchain specific contextual infos
 }
 
-// FilterNodeCommissionRateChanged is a free log retrieval operation binding the contract event 0x3457082cb54c4a2c7d3aa7625139592b366d58c5eef30f64fc9a220d8cb22d5f.
+// FilterNodeDelegatorShareChanged is a free log retrieval operation binding the contract event 0x5a6ed6932fa37b789945b6accca19be2a2e8b7f92485c26714cb8908e4c39cdb.
 //
-// Solidity: event NodeCommissionRateChanged(address indexed nodeAddress, uint8 rate)
-func (_UserStaking *UserStakingFilterer) FilterNodeCommissionRateChanged(opts *bind.FilterOpts, nodeAddress []common.Address) (*UserStakingNodeCommissionRateChangedIterator, error) {
+// Solidity: event NodeDelegatorShareChanged(address indexed nodeAddress, uint8 share)
+func (_UserStaking *UserStakingFilterer) FilterNodeDelegatorShareChanged(opts *bind.FilterOpts, nodeAddress []common.Address) (*UserStakingNodeDelegatorShareChangedIterator, error) {
 
 	var nodeAddressRule []interface{}
 	for _, nodeAddressItem := range nodeAddress {
 		nodeAddressRule = append(nodeAddressRule, nodeAddressItem)
 	}
 
-	logs, sub, err := _UserStaking.contract.FilterLogs(opts, "NodeCommissionRateChanged", nodeAddressRule)
+	logs, sub, err := _UserStaking.contract.FilterLogs(opts, "NodeDelegatorShareChanged", nodeAddressRule)
 	if err != nil {
 		return nil, err
 	}
-	return &UserStakingNodeCommissionRateChangedIterator{contract: _UserStaking.contract, event: "NodeCommissionRateChanged", logs: logs, sub: sub}, nil
+	return &UserStakingNodeDelegatorShareChangedIterator{contract: _UserStaking.contract, event: "NodeDelegatorShareChanged", logs: logs, sub: sub}, nil
 }
 
-// WatchNodeCommissionRateChanged is a free log subscription operation binding the contract event 0x3457082cb54c4a2c7d3aa7625139592b366d58c5eef30f64fc9a220d8cb22d5f.
+// WatchNodeDelegatorShareChanged is a free log subscription operation binding the contract event 0x5a6ed6932fa37b789945b6accca19be2a2e8b7f92485c26714cb8908e4c39cdb.
 //
-// Solidity: event NodeCommissionRateChanged(address indexed nodeAddress, uint8 rate)
-func (_UserStaking *UserStakingFilterer) WatchNodeCommissionRateChanged(opts *bind.WatchOpts, sink chan<- *UserStakingNodeCommissionRateChanged, nodeAddress []common.Address) (event.Subscription, error) {
+// Solidity: event NodeDelegatorShareChanged(address indexed nodeAddress, uint8 share)
+func (_UserStaking *UserStakingFilterer) WatchNodeDelegatorShareChanged(opts *bind.WatchOpts, sink chan<- *UserStakingNodeDelegatorShareChanged, nodeAddress []common.Address) (event.Subscription, error) {
 
 	var nodeAddressRule []interface{}
 	for _, nodeAddressItem := range nodeAddress {
 		nodeAddressRule = append(nodeAddressRule, nodeAddressItem)
 	}
 
-	logs, sub, err := _UserStaking.contract.WatchLogs(opts, "NodeCommissionRateChanged", nodeAddressRule)
+	logs, sub, err := _UserStaking.contract.WatchLogs(opts, "NodeDelegatorShareChanged", nodeAddressRule)
 	if err != nil {
 		return nil, err
 	}
@@ -803,8 +803,8 @@ func (_UserStaking *UserStakingFilterer) WatchNodeCommissionRateChanged(opts *bi
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(UserStakingNodeCommissionRateChanged)
-				if err := _UserStaking.contract.UnpackLog(event, "NodeCommissionRateChanged", log); err != nil {
+				event := new(UserStakingNodeDelegatorShareChanged)
+				if err := _UserStaking.contract.UnpackLog(event, "NodeDelegatorShareChanged", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -825,12 +825,12 @@ func (_UserStaking *UserStakingFilterer) WatchNodeCommissionRateChanged(opts *bi
 	}), nil
 }
 
-// ParseNodeCommissionRateChanged is a log parse operation binding the contract event 0x3457082cb54c4a2c7d3aa7625139592b366d58c5eef30f64fc9a220d8cb22d5f.
+// ParseNodeDelegatorShareChanged is a log parse operation binding the contract event 0x5a6ed6932fa37b789945b6accca19be2a2e8b7f92485c26714cb8908e4c39cdb.
 //
-// Solidity: event NodeCommissionRateChanged(address indexed nodeAddress, uint8 rate)
-func (_UserStaking *UserStakingFilterer) ParseNodeCommissionRateChanged(log types.Log) (*UserStakingNodeCommissionRateChanged, error) {
-	event := new(UserStakingNodeCommissionRateChanged)
-	if err := _UserStaking.contract.UnpackLog(event, "NodeCommissionRateChanged", log); err != nil {
+// Solidity: event NodeDelegatorShareChanged(address indexed nodeAddress, uint8 share)
+func (_UserStaking *UserStakingFilterer) ParseNodeDelegatorShareChanged(log types.Log) (*UserStakingNodeDelegatorShareChanged, error) {
+	event := new(UserStakingNodeDelegatorShareChanged)
+	if err := _UserStaking.contract.UnpackLog(event, "NodeDelegatorShareChanged", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

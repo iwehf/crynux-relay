@@ -38,11 +38,11 @@
       {
         "indexed": false,
         "internalType": "uint8",
-        "name": "rate",
+        "name": "share",
         "type": "uint8"
       }
     ],
-    "name": "NodeCommissionRateChanged",
+    "name": "NodeDelegatorShareChanged",
     "type": "event"
   },
   {
@@ -142,7 +142,7 @@
   },
   {
     "inputs": [],
-    "name": "getAllNodeCommissionRates",
+    "name": "getAllNodeDelegatorShares",
     "outputs": [
       {
         "internalType": "address[]",
@@ -192,7 +192,7 @@
         "type": "address"
       }
     ],
-    "name": "getNodeCommissionRate",
+    "name": "getNodeDelegatorShare",
     "outputs": [
       {
         "internalType": "uint8",
@@ -337,11 +337,11 @@
     "inputs": [
       {
         "internalType": "uint8",
-        "name": "rate",
+        "name": "share",
         "type": "uint8"
       }
     ],
-    "name": "setCommissionRate",
+    "name": "setDelegatorShare",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
