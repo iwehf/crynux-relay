@@ -112,7 +112,7 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 		switch event.Type {
 		case models.RelayAccountEventTypeDeposit:
 			depositReasonByEventID[event.ID] = [2]string{reasons[1], reasons[2]}
-		case models.RelayAccountEventTypeTaskPayment, models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare, models.RelayAccountEventTypeTaskRefund, models.RelayAccountEventTypeUserCommission:
+		case models.RelayAccountEventTypeTaskPayment, models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare, models.RelayAccountEventTypeTaskRefund, models.RelayAccountEventTypeUserDelegation:
 			taskIDSet[reasons[1]] = struct{}{}
 			if event.Type == models.RelayAccountEventTypeTaskPayment {
 				balanceAddressSet[event.Address] = struct{}{}
@@ -277,7 +277,7 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 				balance.Sub(balance, &event.Amount.Int)
 			}
 			validEvents = append(validEvents, event)
-		case models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare, models.RelayAccountEventTypeUserCommission:
+		case models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare, models.RelayAccountEventTypeUserDelegation:
 			task, ok := taskMap[reasons[1]]
 			if !ok {
 				invalidEvents = append(invalidEvents, event)
@@ -701,10 +701,10 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	daoTaskShare := big.NewInt(0).Mul(amount, big.NewInt(0).SetUint64(appConfig.Dao.TaskFeeSharePercent))
 	daoTaskShare.Div(daoTaskShare, big.NewInt(100))
 	nodeIncome := big.NewInt(0).Sub(amount, daoTaskShare)
-	totalCommissionFee := big.NewInt(0)
+	totalDelegatorFee := big.NewInt(0)
 	delegatorShare := GetDelegatorShare(address)
 	if delegatorShare > 0 {
-		totalCommissionFee := totalCommissionFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
+		totalCommissionFee := totalDelegatorFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
 		totalCommissionFee.Div(totalCommissionFee, big.NewInt(100))
 		nodeIncome = nodeIncome.Sub(nodeIncome, totalCommissionFee)
 	}
@@ -727,28 +727,28 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	}
 	events := []models.RelayAccountEvent{rewardEvent, daoEvent}
 
-	if totalCommissionFee.Sign() > 0 {
+	if totalDelegatorFee.Sign() > 0 {
 		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address, network)
 		userAddresses := make([]string, 0, len(userStakings))
-		userCommissionFees := make([]*big.Int, 0, len(userStakings))
-		dispatchedCommissionFee := big.NewInt(0)
+		userDelegatorFees := make([]*big.Int, 0, len(userStakings))
+		dispatchedDelegatorFee := big.NewInt(0)
 		for userAddress, userStakingAmount := range userStakings {
 			userAddresses = append(userAddresses, userAddress)
-			commissionFee := big.NewInt(0).Mul(totalCommissionFee, userStakingAmount)
-			commissionFee = commissionFee.Div(commissionFee, totalUserStakeAmount)
-			userCommissionFees = append(userCommissionFees, commissionFee)
-			dispatchedCommissionFee = dispatchedCommissionFee.Add(dispatchedCommissionFee, commissionFee)
+			delegatorFee := big.NewInt(0).Mul(totalDelegatorFee, userStakingAmount)
+			delegatorFee = delegatorFee.Div(delegatorFee, totalUserStakeAmount)
+			userDelegatorFees = append(userDelegatorFees, delegatorFee)
+			dispatchedDelegatorFee = dispatchedDelegatorFee.Add(dispatchedDelegatorFee, delegatorFee)
 		}
-		userCommissionFees[0].Add(userCommissionFees[0], big.NewInt(0).Sub(totalCommissionFee, dispatchedCommissionFee))
+		userDelegatorFees[0].Add(userDelegatorFees[0], big.NewInt(0).Sub(totalDelegatorFee, dispatchedDelegatorFee))
 
 		for i := range len(userStakings) {
 			events = append(events, models.RelayAccountEvent{
 				Address:   userAddresses[i],
-				Amount:    models.BigInt{Int: *userCommissionFees[i]},
+				Amount:    models.BigInt{Int: *userDelegatorFees[i]},
 				CreatedAt: time.Now(),
 				Status:    models.RelayAccountEventStatusPending,
-				Type:      models.RelayAccountEventTypeUserCommission,
-				Reason:    fmt.Sprintf("%d-%s", models.RelayAccountEventTypeUserCommission, taskIDCommitment),
+				Type:      models.RelayAccountEventTypeUserDelegation,
+				Reason:    fmt.Sprintf("%d-%s", models.RelayAccountEventTypeUserDelegation, taskIDCommitment),
 			})
 		}
 	}
@@ -758,6 +758,17 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 		if err := createRelayAccountEvents(ctx, tx, events); err != nil {
 			return err
 		}
+		if err := addNodeEarning(ctx, db, address, nodeIncome, totalDelegatorFee); err != nil {
+			return err
+		}
+		for _, event := range events {
+			if event.Type == models.RelayAccountEventTypeUserDelegation {
+				if err := addUserStakingEarning(ctx, db, event.Address, address, &event.Amount.Int); err != nil {
+					return err
+				}
+			}
+		}
+
 		if err := addNodeIncentive(ctx, tx, address, incentive, taskType); err != nil {
 			return err
 		}
