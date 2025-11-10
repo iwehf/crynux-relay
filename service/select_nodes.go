@@ -163,7 +163,7 @@ func selectNodeForInferenceTask(ctx context.Context, task *models.InferenceTask)
 	scores := make([]float64, len(nodes))
 	for i, node := range nodes {
 		qos := CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
-		totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(node.Address))
+		totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(node.Address, node.Network))
 		_, _, prob := CalculateSelectingProb(totalStakeAmount, maxStaking, qos)
 		scores[i] = prob
 	}
@@ -248,7 +248,7 @@ func selectNodesForDownloadTask(ctx context.Context, task *models.InferenceTask,
 	scores := make([]float64, len(validNodes))
 	for i, node := range validNodes {
 		qos := CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
-		totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(node.Address))
+		totalStakeAmount := new(big.Int).Add(&node.StakeAmount.Int, GetUserStakeAmountOfNode(node.Address, node.Network))
 		_, _, prob := CalculateSelectingProb(totalStakeAmount, maxStaking, qos)
 		scores[i] = prob
 	}

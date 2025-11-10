@@ -2,40 +2,40 @@ package service
 
 import "sync"
 
-var globalCommissionRateCache = NewCommissionRateCache()
+var globalDelegatorShareCache = NewDelegatorShareCache()
 
-type CommissionRateCache struct {
+type DelegatorShareCache struct {
 	sync.RWMutex
-	commissionRates map[string]uint8
+	delegatorShares map[string]uint8
 }
 
-func (c *CommissionRateCache) set(nodeAddress string, rate uint8) {
+func (c *DelegatorShareCache) set(nodeAddress string, share uint8) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.commissionRates[nodeAddress] = rate
+	c.delegatorShares[nodeAddress] = share
 }
 
-func (c *CommissionRateCache) get(nodeAddress string) uint8 {
+func (c *DelegatorShareCache) get(nodeAddress string) uint8 {
 	c.RLock()
 	defer c.RUnlock()
 
-	if rate, ok := c.commissionRates[nodeAddress]; ok {
-		return rate
+	if share, ok := c.delegatorShares[nodeAddress]; ok {
+		return share
 	}
 	return 0
 }
 
-func NewCommissionRateCache() *CommissionRateCache {
-	return &CommissionRateCache{
-		commissionRates: make(map[string]uint8),
+func NewDelegatorShareCache() *DelegatorShareCache {
+	return &DelegatorShareCache{
+		delegatorShares: make(map[string]uint8),
 	}
 }
 
-func SetCommissionRate(nodeAddress string, rate uint8) {
-	globalCommissionRateCache.set(nodeAddress, rate)
+func SetDelegatorShare(nodeAddress string, share uint8) {
+	globalDelegatorShareCache.set(nodeAddress, share)
 }
 
-func GetCommissionRate(nodeAddress string) uint8 {
-	return globalCommissionRateCache.get(nodeAddress)
+func GetDelegatorShare(nodeAddress string) uint8 {
+	return globalDelegatorShareCache.get(nodeAddress)
 }

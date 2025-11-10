@@ -38,7 +38,16 @@ func GetStaking(c *gin.Context, in *GetStakingInput) (*GetStakingOutput, error) 
 }
 
 func GetUserStakingOfNode(c *gin.Context, in *GetStakingInput) (*GetStakingOutput, error) {
-	amount := service.GetUserStakeAmountOfNode(in.Address)
+	node, err := models.GetNodeByAddress(c.Request.Context(), config.GetDB(), in.Address)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &GetStakingOutput{
+				Data: models.BigInt{Int: *big.NewInt(0)},
+			}, nil
+		}
+		return nil, response.NewExceptionResponse(err)
+	}
+	amount := service.GetUserStakeAmountOfNode(in.Address, node.Network)
 	return &GetStakingOutput{
 		Data: models.BigInt{Int: *amount},
 	}, nil

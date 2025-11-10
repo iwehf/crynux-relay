@@ -58,7 +58,7 @@ func GetNode(c *gin.Context, input *GetNodeInput) (*NodeResponse, error) {
 	qos := service.CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
 	totalStakeAmount := big.NewInt(0)
 	if node.Status != models.NodeStatusQuit {
-		totalStakeAmount = new(big.Int).Add(&node.StakeAmount.Int, service.GetUserStakeAmountOfNode(node.Address))
+		totalStakeAmount = new(big.Int).Add(&node.StakeAmount.Int, service.GetUserStakeAmountOfNode(node.Address, node.Network))
 	}
 	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(totalStakeAmount, service.GetMaxStaking(), qos)
 

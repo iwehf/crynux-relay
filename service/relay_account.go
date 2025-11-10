@@ -696,15 +696,15 @@ func refundTaskPaymentToRelayAccount(ctx context.Context, db *gorm.DB, taskIDCom
 	}, nil
 }
 
-func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int, taskType models.TaskType) (func() error, error) {
+func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address string, amount *big.Int, taskType models.TaskType, network string) (func() error, error) {
 	appConfig := config.GetConfig()
 	daoTaskShare := big.NewInt(0).Mul(amount, big.NewInt(0).SetUint64(appConfig.Dao.TaskFeeSharePercent))
 	daoTaskShare.Div(daoTaskShare, big.NewInt(100))
 	nodeIncome := big.NewInt(0).Sub(amount, daoTaskShare)
 	totalCommissionFee := big.NewInt(0)
-	commissionRate := GetCommissionRate(address)
-	if commissionRate > 0 {
-		totalCommissionFee := totalCommissionFee.Mul(nodeIncome, big.NewInt(int64(commissionRate)))
+	delegatorShare := GetDelegatorShare(address)
+	if delegatorShare > 0 {
+		totalCommissionFee := totalCommissionFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
 		totalCommissionFee.Div(totalCommissionFee, big.NewInt(100))
 		nodeIncome = nodeIncome.Sub(nodeIncome, totalCommissionFee)
 	}
@@ -728,7 +728,7 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	events := []models.RelayAccountEvent{rewardEvent, daoEvent}
 
 	if totalCommissionFee.Sign() > 0 {
-		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address)
+		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address, network)
 		userAddresses := make([]string, 0, len(userStakings))
 		userCommissionFees := make([]*big.Int, 0, len(userStakings))
 		dispatchedCommissionFee := big.NewInt(0)

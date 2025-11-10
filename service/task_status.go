@@ -453,6 +453,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 		taskIDCommitment string
 		address          string
 		payment          *big.Int
+		network          string
 	}
 	payments := make([]taskPayment, 0)
 	if len(tasks) > 1 {
@@ -460,12 +461,22 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 		// calculate each task's payment
 		var totalScore uint64 = 0
 		var validTasks []models.InferenceTask
+		var validNodeAddresses []string
 		for _, t := range tasks {
 			if t.Status == models.TaskGroupValidated || t.Status == models.TaskEndGroupRefund {
 				// qos of task in group validated or group refunded task is valid
 				totalScore += uint64(t.QOSScore.Int64)
 				validTasks = append(validTasks, t)
+				validNodeAddresses = append(validNodeAddresses, t.SelectedNode)
 			}
+		}
+		validNodes, err := models.GetNodesByAddresses(ctx, db, validNodeAddresses)
+		if err != nil {
+			return err
+		}
+		nodeNetworkMap := make(map[string]string)
+		for _, node := range validNodes {
+			nodeNetworkMap[node.Address] = node.Network
 		}
 		totalRem := big.NewInt(0)
 		for i, t := range validTasks {
@@ -479,6 +490,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 				taskIDCommitment: t.TaskIDCommitment,
 				address:          t.SelectedNode,
 				payment:          payment,
+				network:          nodeNetworkMap[t.SelectedNode],
 			})
 		}
 
@@ -487,6 +499,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			taskIDCommitment: task.TaskIDCommitment,
 			address:          task.SelectedNode,
 			payment:          &task.TaskFee.Int,
+			network:          node.Network,
 		})
 	}
 
@@ -495,7 +508,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var commitFuncs []func() error
 		for _, payment := range payments {
-			commitFunc, err := sendTaskIncome(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment, task.TaskType)
+			commitFunc, err := sendTaskIncome(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment, task.TaskType, payment.network)
 			if err != nil {
 				return err
 			}

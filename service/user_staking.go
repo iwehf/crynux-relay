@@ -1,11 +1,17 @@
 package service
 
 import (
+	"context"
+	"crynux_relay/config"
+	"crynux_relay/models"
 	"math/big"
 	"sync"
+	"time"
+
+	"gorm.io/gorm"
 )
 
-var globalUserStakingCache = newUserStakingCache()
+var globalUserStakingCaches = newUserStakingCaches()
 
 type userStakingCache struct {
 	sync.RWMutex
@@ -14,12 +20,17 @@ type userStakingCache struct {
 	nodeStakeAmount  map[string]*big.Int
 }
 
-func newUserStakingCache() *userStakingCache {
-	return &userStakingCache{
-		nodeUserStakings: make(map[string]map[string]*big.Int),
-		userStakeAmount:  make(map[string]*big.Int),
-		nodeStakeAmount:  make(map[string]*big.Int),
+func newUserStakingCaches() map[string]*userStakingCache {
+	appConfig := config.GetConfig()
+	caches := make(map[string]*userStakingCache)
+	for network := range appConfig.Blockchains {
+		caches[network] = &userStakingCache{
+			nodeUserStakings: make(map[string]map[string]*big.Int),
+			userStakeAmount:  make(map[string]*big.Int),
+			nodeStakeAmount:  make(map[string]*big.Int),
+		}
 	}
+	return caches
 }
 
 func (c *userStakingCache) update(userAddress, nodeAddress string, amount *big.Int) {
@@ -102,26 +113,41 @@ func (c *userStakingCache) getUserStakingsOfNode(nodeAddress string) (map[string
 	}
 }
 
-func UpdateUserStaking(userAddress, nodeAddress string, amount *big.Int) {
-	globalUserStakingCache.update(userAddress, nodeAddress, amount)
+func InitUserStakingCache(ctx context.Context, db *gorm.DB) error {
+	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var userStakings []models.UserStaking
+	if err := db.WithContext(dbCtx).Model(&models.UserStaking{}).Where("valid = ?", true).Find(&userStakings).Error; err != nil {
+		return err
+	}
+
+	for _, userStaking := range userStakings {
+		UpdateUserStaking(userStaking.UserAddress, userStaking.NodeAddress, &userStaking.Amount.Int, userStaking.Network)
+	}
+	return nil
 }
 
-func UnstakeUserStaking(userAddress, nodeAddress string) {
-	globalUserStakingCache.unstake(userAddress, nodeAddress)
+func UpdateUserStaking(userAddress, nodeAddress string, amount *big.Int, network string) {
+	globalUserStakingCaches[network].update(userAddress, nodeAddress, amount)
 }
 
-func RemoveNodeUserStaking(nodeAddress string) {
-	globalUserStakingCache.removeNode(nodeAddress)
+func UnstakeUserStaking(userAddress, nodeAddress, network string) {
+	globalUserStakingCaches[network].unstake(userAddress, nodeAddress)
 }
 
-func GetUserStakeAmountOfUser(userAddress string) *big.Int {
-	return globalUserStakingCache.getUserStakeAmount(userAddress)
+func RemoveNodeUserStaking(nodeAddress, network string) {
+	globalUserStakingCaches[network].removeNode(nodeAddress)
 }
 
-func GetUserStakeAmountOfNode(nodeAddress string) *big.Int {
-	return globalUserStakingCache.getNodeStakeAmount(nodeAddress)
+func GetUserStakeAmountOfUser(userAddress, network string) *big.Int {
+	return globalUserStakingCaches[network].getUserStakeAmount(userAddress)
 }
 
-func GetUserStakingsOfNode(nodeAddress string) (map[string]*big.Int, *big.Int) {
-	return globalUserStakingCache.getUserStakingsOfNode(nodeAddress)
+func GetUserStakeAmountOfNode(nodeAddress, network string) *big.Int {
+	return globalUserStakingCaches[network].getNodeStakeAmount(nodeAddress)
+}
+
+func GetUserStakingsOfNode(nodeAddress, network string) (map[string]*big.Int, *big.Int) {
+	return globalUserStakingCaches[network].getUserStakingsOfNode(nodeAddress)
 }

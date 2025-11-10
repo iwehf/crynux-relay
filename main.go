@@ -42,6 +42,9 @@ func main() {
 	if err := service.InitRelayAccountCache(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
+	if err := service.InitUserStakingCache(context.Background(), config.GetDB()); err != nil {
+		log.Fatalln(err)
+	}
 	if err := service.InitSelectingProb(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}

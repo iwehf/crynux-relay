@@ -37,7 +37,7 @@ type Node struct {
 	StakeAmount             BigInt         `json:"stake_amount"`
 	HealthBase              float64        `json:"health_base" gorm:"default:1.0"`
 	HealthUpdatedAt         sql.NullTime   `json:"health_updated_at" gorm:"null;default:null"`
-	CommissionRate          uint8          `json:"commission_rate"`
+	DelegatorShare          uint8          `json:"delegator_share"`
 	CurrentTaskIDCommitment sql.NullString `json:"current_task_id_commitment" gorm:"null;default:null"`
 	CurrentTask             InferenceTask  `json:"-" gorm:"foreignKey:TaskIDCommitment;references:CurrentTaskIDCommitment"`
 	Models                  []NodeModel    `json:"-" gorm:"foreignKey:NodeAddress;references:Address"`
@@ -103,6 +103,16 @@ func GetNodeByAddress(ctx context.Context, db *gorm.DB, address string) (*Node, 
 		return nil, err
 	}
 	return node, nil
+}
+
+func GetNodesByAddresses(ctx context.Context, db *gorm.DB, addresses []string) ([]*Node, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var nodes []*Node
+	if err := db.WithContext(dbCtx).Model(&Node{}).Where("address in (?)", addresses).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
 }
 
 type NodeModel struct {
