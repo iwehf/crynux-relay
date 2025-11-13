@@ -728,7 +728,11 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	events := []models.RelayAccountEvent{rewardEvent, daoEvent}
 
 	if totalDelegatorFee.Sign() > 0 {
-		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address, network)
+		userStakings := GetUserStakingsOfNode(address, network)
+		totalUserStakeAmount := big.NewInt(0)
+		for _, amount := range userStakings {
+			totalUserStakeAmount = totalUserStakeAmount.Add(totalUserStakeAmount, amount)
+		}
 		userAddresses := make([]string, 0, len(userStakings))
 		userDelegatorFees := make([]*big.Int, 0, len(userStakings))
 		dispatchedDelegatorFee := big.NewInt(0)
@@ -758,12 +762,15 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 		if err := createRelayAccountEvents(ctx, tx, events); err != nil {
 			return err
 		}
-		if err := addNodeEarning(ctx, db, address, nodeIncome, totalDelegatorFee); err != nil {
+		if err := addNodeEarning(ctx, tx, address, nodeIncome, totalDelegatorFee); err != nil {
 			return err
 		}
 		for _, event := range events {
 			if event.Type == models.RelayAccountEventTypeUserDelegation {
-				if err := addUserStakingEarning(ctx, db, event.Address, address, &event.Amount.Int); err != nil {
+				if err := addUserStakingEarning(ctx, tx, event.Address, address, network, &event.Amount.Int); err != nil {
+					return err
+				}
+				if err := addUserEarning(ctx, tx, event.Address, &event.Amount.Int); err != nil {
 					return err
 				}
 			}

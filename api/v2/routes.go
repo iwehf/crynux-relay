@@ -49,7 +49,11 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Node join"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(nodes.NodeJoin, 200))
-
+	nodeGroup.GET("/delegated", []fizz.OperationOption{
+		fizz.ID("delegated_nodes_v2"),
+		fizz.Summary("Get delegated nodes"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, tonic.Handler(nodes.GetDelegatedNodes, 200))
 	adminGroup := v2g.Group("admin", "admin", "Admin APIs")
 	adminNodesGroup := adminGroup.Group("nodes", "admin nodes", "Admin node management APIs")
 	adminNodesGroup.GET("/qos", []fizz.OperationOption{

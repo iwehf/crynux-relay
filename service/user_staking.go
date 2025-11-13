@@ -16,6 +16,7 @@ var globalUserStakingCaches = newUserStakingCaches()
 type userStakingCache struct {
 	sync.RWMutex
 	nodeUserStakings map[string]map[string]*big.Int
+	userNodeStakings map[string]map[string]*big.Int
 	userStakeAmount  map[string]*big.Int
 	nodeStakeAmount  map[string]*big.Int
 }
@@ -26,6 +27,7 @@ func newUserStakingCaches() map[string]*userStakingCache {
 	for network := range appConfig.Blockchains {
 		caches[network] = &userStakingCache{
 			nodeUserStakings: make(map[string]map[string]*big.Int),
+			userNodeStakings: make(map[string]map[string]*big.Int),
 			userStakeAmount:  make(map[string]*big.Int),
 			nodeStakeAmount:  make(map[string]*big.Int),
 		}
@@ -42,12 +44,18 @@ func (c *userStakingCache) update(userAddress, nodeAddress string, amount *big.I
 		if val, ok1 := userStakings[userAddress]; ok1 {
 			oldAmount.Set(val)
 		}
+	} else {
+		c.nodeUserStakings[nodeAddress] = make(map[string]*big.Int)
+	}
+	if _, ok := c.userNodeStakings[userAddress]; !ok {
+		c.userNodeStakings[userAddress] = make(map[string]*big.Int)
 	}
 	c.userStakeAmount[userAddress].Sub(c.userStakeAmount[userAddress], oldAmount)
 	c.userStakeAmount[userAddress].Add(c.userStakeAmount[userAddress], amount)
 	c.nodeStakeAmount[nodeAddress].Sub(c.nodeStakeAmount[nodeAddress], oldAmount)
 	c.nodeStakeAmount[nodeAddress].Add(c.nodeStakeAmount[nodeAddress], amount)
 	c.nodeUserStakings[nodeAddress][userAddress] = big.NewInt(0).Set(amount)
+	c.userNodeStakings[userAddress][nodeAddress] = big.NewInt(0).Set(amount)
 }
 
 func (c *userStakingCache) unstake(userAddress, nodeAddress string) {
@@ -62,6 +70,14 @@ func (c *userStakingCache) unstake(userAddress, nodeAddress string) {
 		}
 		if len(c.nodeUserStakings[nodeAddress]) == 0 {
 			delete(c.nodeUserStakings, nodeAddress)
+		}
+	}
+	if nodeStakings, ok := c.userNodeStakings[userAddress]; ok {
+		if _, ok1 := nodeStakings[nodeAddress]; ok1 {
+			delete(c.userNodeStakings[userAddress], nodeAddress)
+		}
+		if len(c.userNodeStakings[userAddress]) == 0 {
+			delete(c.userNodeStakings, userAddress)
 		}
 	}
 	c.userStakeAmount[userAddress].Sub(c.userStakeAmount[userAddress], oldAmount)
@@ -101,16 +117,30 @@ func (c *userStakingCache) getNodeStakeAmount(nodeAddress string) *big.Int {
 	return res
 }
 
-func (c *userStakingCache) getUserStakingsOfNode(nodeAddress string) (map[string]*big.Int, *big.Int) {
+func (c *userStakingCache) getUserStakingsOfNode(nodeAddress string) map[string]*big.Int {
 	c.RLock()
 	defer c.RUnlock()
 
-	userStakeAmount := c.userStakeAmount[nodeAddress]
-	if res, ok := c.nodeUserStakings[nodeAddress]; ok {
-		return res, userStakeAmount
-	} else {
-		return make(map[string]*big.Int), userStakeAmount
+	res := make(map[string]*big.Int)
+	if userStakings, ok := c.nodeUserStakings[nodeAddress]; ok {
+		for userAddress, amount := range userStakings {
+			res[userAddress] = big.NewInt(0).Set(amount)
+		}
 	}
+	return res
+}
+
+func (c *userStakingCache) getUserStakingsOfUser(userAddress string) map[string]*big.Int {
+	c.RLock()
+	defer c.RUnlock()
+
+	res := make(map[string]*big.Int)
+	if nodeStakings, ok := c.userNodeStakings[userAddress]; ok {
+		for nodeAddress, amount := range nodeStakings {
+			res[nodeAddress] = big.NewInt(0).Set(amount)
+		}
+	}
+	return res
 }
 
 func (c *userStakingCache) getDelegatorCountOfNode(nodeAddress string) int {
@@ -119,6 +149,17 @@ func (c *userStakingCache) getDelegatorCountOfNode(nodeAddress string) int {
 
 	if userStakings, ok := c.nodeUserStakings[nodeAddress]; ok {
 		return len(userStakings)
+	} else {
+		return 0
+	}
+}
+
+func (c *userStakingCache) getDelegationCountOfUser(userAddress string) int {
+	c.RLock()
+	defer c.RUnlock()
+
+	if nodeStakings, ok := c.userNodeStakings[userAddress]; ok {
+		return len(nodeStakings)
 	} else {
 		return 0
 	}
@@ -159,10 +200,18 @@ func GetUserStakeAmountOfNode(nodeAddress, network string) *big.Int {
 	return globalUserStakingCaches[network].getNodeStakeAmount(nodeAddress)
 }
 
-func GetUserStakingsOfNode(nodeAddress, network string) (map[string]*big.Int, *big.Int) {
+func GetUserStakingsOfNode(nodeAddress, network string) map[string]*big.Int {
 	return globalUserStakingCaches[network].getUserStakingsOfNode(nodeAddress)
+}
+
+func GetUserStakingsOfUser(userAddress, network string) map[string]*big.Int {
+	return globalUserStakingCaches[network].getUserStakingsOfUser(userAddress)
 }
 
 func GetDelegatorCountOfNode(nodeAddress, network string) int {
 	return globalUserStakingCaches[network].getDelegatorCountOfNode(nodeAddress)
+}
+
+func GetDelegationCountOfUser(userAddress, network string) int {
+	return globalUserStakingCaches[network].getDelegationCountOfUser(userAddress)
 }
