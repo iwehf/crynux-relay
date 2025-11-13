@@ -655,7 +655,11 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 	events := []*models.TaskFeeEvent{rewardEvent, daoEvent}
 
 	if totalDelegatorFee.Sign() > 0 {
-		userStakings, totalUserStakeAmount := GetUserStakingsOfNode(address, network)
+		userStakings := GetUserStakingsOfNode(address, network)
+		totalUserStakeAmount := big.NewInt(0)
+		for _, amount := range userStakings {
+			totalUserStakeAmount = totalUserStakeAmount.Add(totalUserStakeAmount, amount)
+		}
 		userAddresses := make([]string, 0, len(userStakings))
 		userDelegatorFees := make([]*big.Int, 0, len(userStakings))
 		dispatchedCommissionFee := big.NewInt(0)
@@ -677,7 +681,10 @@ func sendTaskFee(ctx context.Context, db *gorm.DB, taskIDCommitment, address str
 				Type:      models.TaskFeeEventTypeUserCommission,
 				Reason:    fmt.Sprintf("%d-%s", models.TaskFeeEventTypeUserCommission, taskIDCommitment),
 			})
-			if err := addUserStakingEarning(ctx, db, userAddresses[i], address, userDelegatorFees[i]); err != nil {
+			if err := addUserStakingEarning(ctx, db, userAddresses[i], address, network, userDelegatorFees[i]); err != nil {
+				return nil, err
+			}
+			if err := addUserEarning(ctx, db, userAddresses[i], userDelegatorFees[i]); err != nil {
 				return nil, err
 			}
 		}

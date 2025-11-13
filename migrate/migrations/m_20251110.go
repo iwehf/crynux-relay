@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/go-gormigrate/gormigrate/v2"
@@ -10,19 +11,28 @@ import (
 func M20251110(db *gorm.DB) *gormigrate.Gormigrate {
 	type UserStakingEarning struct {
 		gorm.Model
-		UserAddress string    `json:"user_address" gorm:"uniqueIndex:idx_user_node_time;type:string;size:191;not null"`
-		NodeAddress string    `json:"node_address" gorm:"uniqueIndex:idx_user_node_time;type:string;size:191;not null"`
-		Earning     string    `json:"earning" gorm:"type:string;size:191;not null"`
-		Time        time.Time `json:"time" gorm:"uniqueIndex:idx_user_node_time"`
+		UserAddress string       `json:"user_address" gorm:"uniqueIndex:idx_user_node_network_time;type:string;size:191;not null"`
+		NodeAddress string       `json:"node_address" gorm:"uniqueIndex:idx_user_node_network_time;type:string;size:191;not null"`
+		Network     string       `json:"network" gorm:"uniqueIndex:idx_user_node_network_time;type:string;size:191;not null"`
+		Earning     string       `json:"earning" gorm:"type:string;size:191;not null"`
+		Time        sql.NullTime `json:"time" gorm:"uniqueIndex:idx_user_node_network_time"`
 	}
 
 	type NodeEarning struct {
 		gorm.Model
-		NodeAddress      string    `json:"node_address" gorm:"uniqueIndex:idx_node_time;type:string;size:191;not null"`
-		OperatorEarning  string    `json:"operator_earning" gorm:"type:string;size:191;not null"`
-		DelegatorEarning string    `json:"delegator_earning" gorm:"type:string;size:191;not null"`
-		Time             time.Time `json:"time" gorm:"uniqueIndex:idx_node_time"`
+		NodeAddress      string       `json:"node_address" gorm:"uniqueIndex:idx_node_time;type:string;size:191;not null"`
+		OperatorEarning  string       `json:"operator_earning" gorm:"type:string;size:191;not null"`
+		DelegatorEarning string       `json:"delegator_earning" gorm:"type:string;size:191;not null"`
+		Time             sql.NullTime `json:"time" gorm:"uniqueIndex:idx_node_time"`
 	}
+
+	type UserEarning struct {
+		gorm.Model
+		UserAddress string       `json:"node_address" gorm:"uniqueIndex:idx_user_time;type:string;size:191;not null"`
+		Earning     string       `json:"earning" gorm:"type:string;size:191;not null"`
+		Time        sql.NullTime `json:"time" gorm:"uniqueIndex:idx_user_time"`
+	}
+
 
 	type NodeDelegatorCount struct {
 		gorm.Model
@@ -58,6 +68,9 @@ func M20251110(db *gorm.DB) *gormigrate.Gormigrate {
 				if err := tx.Migrator().CreateTable(&NodeEarning{}); err != nil {
 					return err
 				}
+				if err := tx.Migrator().CreateTable(&UserEarning{}); err != nil {
+					return err
+				}
 				if err := tx.Migrator().CreateTable(&NodeDelegatorCount{}); err != nil {
 					return err
 				}
@@ -77,6 +90,11 @@ func M20251110(db *gorm.DB) *gormigrate.Gormigrate {
 				}
 				if tx.Migrator().HasTable(&NodeEarning{}) {
 					if err := tx.Migrator().DropTable(&NodeEarning{}); err != nil {
+						return err
+					}
+				}
+				if tx.Migrator().HasTable(&UserEarning{}) {
+					if err := tx.Migrator().DropTable(&UserEarning{}); err != nil {
 						return err
 					}
 				}

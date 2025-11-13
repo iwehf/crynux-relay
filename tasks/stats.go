@@ -500,7 +500,7 @@ func getAllNodes(ctx context.Context, db *gorm.DB) ([]models.Node, error) {
 	return allNodes, nil
 }
 
-func batchUpdateNodeScores(ctx context.Context, db *gorm.DB, nodes []models.Node, t time.Time) error {
+func batchCreateNodeScores(ctx context.Context, db *gorm.DB, nodes []models.Node, t time.Time) error {
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -528,12 +528,12 @@ func batchUpdateNodeScores(ctx context.Context, db *gorm.DB, nodes []models.Node
 }
 
 func statsNodeScores(ctx context.Context) error {
-	t := time.Now().UTC().Truncate(time.Hour)
+	t := time.Now().UTC().Truncate(4 * time.Hour)
 	nodes, err := getAllNodes(ctx, config.GetDB())
 	if err != nil {
 		return err
 	}
-	if err := batchUpdateNodeScores(ctx, config.GetDB(), nodes, t); err != nil {
+	if err := batchCreateNodeScores(ctx, config.GetDB(), nodes, t); err != nil {
 		return err
 	}
 	return nil
@@ -587,7 +587,7 @@ func batchCreateNodeStakings(ctx context.Context, db *gorm.DB, nodes []models.No
 }
 
 func statsNodeStakings(ctx context.Context) error {
-	t := time.Now().UTC().Truncate(24 * time.Hour)
+	t := time.Now().UTC().Truncate(4 * time.Hour)
 	nodes, err := getAllNodes(ctx, config.GetDB())
 	if err != nil {
 		return err
@@ -599,7 +599,7 @@ func statsNodeStakings(ctx context.Context) error {
 }
 
 func StartStatsNodeStakings(ctx context.Context) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(4 * time.Hour)
 
 	for {
 		select {

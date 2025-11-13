@@ -4,9 +4,7 @@ import (
 	"crynux_relay/api/v2/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"crynux_relay/service"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/gin-gonic/gin"
@@ -22,16 +20,24 @@ func GetNode(c *gin.Context, input *GetNodeInput) (*NodeResponse, error) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &NodeResponse{
 			Data: &Node{
-				Address:       input.Address,
-				Status:        models.NodeStatusQuit,
-				GPUName:       "",
-				GPUVram:       0,
-				QOSScore:      0,
-				StakingScore:  0,
-				ProbWeight:    0,
-				Version:       "",
-				InUseModelIDs: []string{},
-				ModelIDs:      []string{},
+				Address:                input.Address,
+				Status:                 models.NodeStatusQuit,
+				GPUName:                "",
+				GPUVram:                0,
+				Version:                "",
+				InUseModelIDs:          []string{},
+				ModelIDs:               []string{},
+				StakingScore:           0,
+				QOSScore:               0,
+				ProbWeight:             0,
+				DelegatorStaking:       models.BigInt{Int: *big.NewInt(0)},
+				OperatorStaking:        models.BigInt{Int: *big.NewInt(0)},
+				DelegatorShare:         0,
+				DelegatorsNum:          0,
+				TotalOperatorEarnings:  models.BigInt{Int: *big.NewInt(0)},
+				TodayOperatorEarnings:  models.BigInt{Int: *big.NewInt(0)},
+				TotalDelegatorEarnings: models.BigInt{Int: *big.NewInt(0)},
+				TodayDelegatorEarnings: models.BigInt{Int: *big.NewInt(0)},
 			},
 		}, nil
 	}
@@ -39,40 +45,12 @@ func GetNode(c *gin.Context, input *GetNodeInput) (*NodeResponse, error) {
 		return nil, response.NewExceptionResponse(err)
 	}
 
-	nodeModels, err := models.GetNodeModelsByNodeAddress(c.Request.Context(), config.GetDB(), node.Address)
+	nodeData, err := getNodeData(c.Request.Context(), node)
 	if err != nil {
 		return nil, response.NewExceptionResponse(err)
 	}
 
-	modelIDs := make([]string, 0)
-	inUseModelIDs := make([]string, 0)
-	for _, model := range nodeModels {
-		modelIDs = append(modelIDs, model.ModelID)
-		if model.InUse {
-			inUseModelIDs = append(inUseModelIDs, model.ModelID)
-		}
-	}
-
-	nodeVersion := fmt.Sprintf("%d.%d.%d", node.MajorVersion, node.MinorVersion, node.PatchVersion)
-
-	totalStakeAmount := big.NewInt(0)
-	if node.Status != models.NodeStatusQuit {
-		totalStakeAmount = new(big.Int).Add(&node.StakeAmount.Int, service.GetUserStakeAmountOfNode(node.Address, node.Network))
-	}
-	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(totalStakeAmount, service.GetMaxStaking(), node.QOSScore, service.GetMaxQosScore())
-
 	return &NodeResponse{
-		Data: &Node{
-			Address:       node.Address,
-			Status:        node.Status,
-			GPUName:       node.GPUName,
-			GPUVram:       node.GPUVram,
-			QOSScore:      qosScore,
-			StakingScore:  stakingScore,
-			ProbWeight:    probWeight,
-			Version:       nodeVersion,
-			InUseModelIDs: inUseModelIDs,
-			ModelIDs:      modelIDs,
-		},
+		Data: nodeData,
 	}, nil
 }
