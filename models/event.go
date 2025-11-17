@@ -304,6 +304,7 @@ type UserStakingEvent struct {
 	UserAddress string `json:"user_address"`
 	NodeAddress string `json:"node_address"`
 	Amount      BigInt `json:"amount"`
+	Network     string `json:"network"`
 }
 
 func (e *UserStakingEvent) ToEvent() (*Event, error) {
@@ -322,6 +323,7 @@ type UserUnstakingEvent struct {
 	UserAddress string `json:"user_address"`
 	NodeAddress string `json:"node_address"`
 	Amount      BigInt `json:"amount"`
+	Network     string `json:"network"`
 }
 
 func (e *UserUnstakingEvent) ToEvent() (*Event, error) {
@@ -339,6 +341,7 @@ func (e *UserUnstakingEvent) ToEvent() (*Event, error) {
 type NodeDelegatorShareChangedEvent struct {
 	NodeAddress string `json:"node_address"`
 	Share       uint8  `json:"share"`
+	Network     string `json:"network"`
 }
 
 func (e *NodeDelegatorShareChangedEvent) ToEvent() (*Event, error) {

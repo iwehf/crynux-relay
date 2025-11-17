@@ -124,6 +124,7 @@ func addUserStakingEarning(ctx context.Context, db *gorm.DB, userAddress, nodeAd
 					NodeAddress: nodeAddress,
 					Time:        sql.NullTime{Time: t, Valid: true},
 					Earning:     models.BigInt{Int: *big.NewInt(0)},
+					Network:     network,
 				}
 			} else {
 				return err
@@ -144,6 +145,7 @@ func addUserStakingEarning(ctx context.Context, db *gorm.DB, userAddress, nodeAd
 					NodeAddress: nodeAddress,
 					Time:        sql.NullTime{Valid: false},
 					Earning:     models.BigInt{Int: *big.NewInt(0)},
+					Network:     network,
 				}
 			} else {
 				return err
