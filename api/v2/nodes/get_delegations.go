@@ -13,8 +13,8 @@ import (
 )
 
 type GetDelegationsInput struct {
-	NodeAddress string `json:"node_address" path:"node_address" description:"node address" validate:"required"`
-	Network     string `json:"network" query:"network" description:"network of the delegations" validate:"required"`
+	Address string `json:"address" path:"address" description:"node address" validate:"required"`
+	Network string `json:"network" query:"network" description:"network of the delegations" validate:"required"`
 }
 
 type DelegationInfo struct {
@@ -33,7 +33,7 @@ type GetDelegationsOutput struct {
 }
 
 func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegationsOutput, error) {
-	userStakings, err := models.GetUserStakingsOfNode(c.Request.Context(), config.GetDB(), input.NodeAddress, &input.Network)
+	userStakings, err := models.GetUserStakingsOfNode(c.Request.Context(), config.GetDB(), input.Address, &input.Network)
 	if err != nil {
 		return nil, response.NewExceptionResponse(err)
 	}
@@ -53,7 +53,7 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 				<-semaphore
 			}()
 			totalEarningAmount := big.NewInt(0)
-			totalEarning, err := models.GetTotalUserStakingEarning(c.Request.Context(), config.GetDB(), userAddress, input.NodeAddress, input.Network)
+			totalEarning, err := models.GetTotalUserStakingEarning(c.Request.Context(), config.GetDB(), userAddress, input.Address, input.Network)
 			if err != nil {
 				if !errors.Is(err, gorm.ErrRecordNotFound) {
 					errCh <- err
@@ -64,7 +64,7 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 			}
 			totalEarningsMap[userAddress] = models.BigInt{Int: *totalEarningAmount}
 
-			todayEarnings, err := models.GetUserStakingEarnings(c.Request.Context(), config.GetDB(), userAddress, input.NodeAddress, input.Network, start, end)
+			todayEarnings, err := models.GetUserStakingEarnings(c.Request.Context(), config.GetDB(), userAddress, input.Address, input.Network, start, end)
 			if err != nil {
 				errCh <- err
 				return
@@ -83,7 +83,7 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 		}
 	}
 
-	var res []DelegationInfo
+	res := make([]DelegationInfo, 0)
 	for _, userStaking := range userStakings {
 		res = append(res, DelegationInfo{
 			UserAddress:   userStaking.UserAddress,

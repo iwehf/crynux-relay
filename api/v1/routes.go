@@ -114,10 +114,6 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Get node current task"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(nodes.GetNodeTask, 200))
-	nodeGroup.GET("/:address/delegations", []fizz.OperationOption{
-		fizz.Summary("Get delegations of the node"),
-		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(nodes.GetDelegations, 200))
 
 	balanceGroup := v1g.Group("balance", "balance", "balance related APIs")
 	balanceGroup.GET("/:address", []fizz.OperationOption{
@@ -334,6 +330,7 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(delegator.GetDelegatorInfo, 200))
 	delegatorGroup.GET("/:user_address/delegations", []fizz.OperationOption{
+		fizz.ID("get_user_delegations"),
 		fizz.Summary("Get all delegations of the user"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(delegator.GetDelegations, 200))

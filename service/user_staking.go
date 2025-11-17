@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var globalUserStakingCaches = newUserStakingCaches()
+var globalUserStakingCaches map[string]*userStakingCache
 
 type userStakingCache struct {
 	sync.RWMutex
@@ -49,6 +49,12 @@ func (c *userStakingCache) update(userAddress, nodeAddress string, amount *big.I
 	}
 	if _, ok := c.userNodeStakings[userAddress]; !ok {
 		c.userNodeStakings[userAddress] = make(map[string]*big.Int)
+	}
+	if _, ok := c.userStakeAmount[userAddress]; !ok {
+		c.userStakeAmount[userAddress] = big.NewInt(0)
+	}
+	if _, ok := c.nodeStakeAmount[nodeAddress]; !ok {
+		c.nodeStakeAmount[nodeAddress] = big.NewInt(0)
 	}
 	c.userStakeAmount[userAddress].Sub(c.userStakeAmount[userAddress], oldAmount)
 	c.userStakeAmount[userAddress].Add(c.userStakeAmount[userAddress], amount)
@@ -166,6 +172,8 @@ func (c *userStakingCache) getDelegationCountOfUser(userAddress string) int {
 }
 
 func InitUserStakingCache(ctx context.Context, db *gorm.DB) error {
+	globalUserStakingCaches = newUserStakingCaches()
+
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

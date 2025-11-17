@@ -45,16 +45,19 @@ func main() {
 	if err := service.InitTaskQuotaCache(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
+	if err := service.InitDelegatorShareCache(context.Background(), config.GetDB()); err != nil {
+		log.Fatalln(err)
+	}
 	if err := service.InitUserStakingCache(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
 	if err := service.InitSelectingProb(context.Background(), config.GetDB()); err != nil {
 		log.Fatalln(err)
 	}
-	
+
 	tm := blockchain.NewTransactionManager(config.GetDB())
 	tm.Start(context.Background())
-		
+
 	service.StartBlockListener(context.Background())
 	go service.StartTaskProcesser(context.Background())
 	go service.StartTaskQuotaSync(context.Background(), config.GetDB())

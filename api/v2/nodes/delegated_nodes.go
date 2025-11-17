@@ -9,8 +9,8 @@ import (
 )
 
 type GetDelegatedNodesInput struct {
-	Page     *int `json:"page" query:"page" description:"page number" validate:"required,min=1" default:"1"`
-	PageSize *int `json:"page_size" query:"page_size" description:"number of items per page" validate:"required,min=1,max=100" default:"30"`
+	Page     int `json:"page" query:"page" description:"page number" validate:"min=1" default:"1"`
+	PageSize int `json:"page_size" query:"page_size" description:"number of items per page" validate:"min=1,max=100" default:"30"`
 }
 
 type GetDelegatedNodesOutput struct {
@@ -20,12 +20,12 @@ type GetDelegatedNodesOutput struct {
 
 func GetDelegatedNodes(c *gin.Context, input *GetDelegatedNodesInput) (*GetDelegatedNodesOutput, error) {
 	page := 1
-	if input.Page != nil {
-		page = *input.Page
+	if input.Page != 0 {
+		page = input.Page
 	}
 	pageSize := 30
-	if input.PageSize != nil {
-		pageSize = *input.PageSize
+	if input.PageSize != 0 {
+		pageSize = input.PageSize
 	}
 
 	nodes, err := models.GetDelegatedNodes(c.Request.Context(), config.GetDB(), (page-1)*pageSize, pageSize)
@@ -48,6 +48,7 @@ func GetDelegatedNodes(c *gin.Context, input *GetDelegatedNodesInput) (*GetDeleg
 				return
 			}
 			nodeDatas = append(nodeDatas, nodeData)
+			errCh <- nil
 		}(node)
 	}
 	for i := 0; i < len(nodes); i++ {
