@@ -113,11 +113,11 @@ func GetNodesByAddresses(ctx context.Context, db *gorm.DB, addresses []string) (
 	return nodes, nil
 }
 
-func GetDelegatedNodes(ctx context.Context, db *gorm.DB, offset, limit int) ([]*Node, error) {
+func GetDelegatedNodes(ctx context.Context, db *gorm.DB) ([]*Node, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var nodes []*Node
-	if err := db.WithContext(dbCtx).Model(&Node{}).Where("delegator_share > ?", 0).Offset(offset).Limit(limit).Find(&nodes).Error; err != nil {
+	if err := db.WithContext(dbCtx).Model(&Node{}).Where("delegator_share > ?", 0).Find(&nodes).Error; err != nil {
 		return nil, err
 	}
 	return nodes, nil

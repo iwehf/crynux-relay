@@ -6,6 +6,7 @@ import (
 	"crynux_relay/models"
 	"errors"
 	"math/big"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -95,6 +96,10 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 			TodayEarnings: todayEarningsMap[userStaking.UserAddress],
 		})
 	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].TotalEarnings.Cmp(&res[j].TotalEarnings.Int) > 0
+	})
 
 	return &GetDelegationsOutput{
 		Data: res,
