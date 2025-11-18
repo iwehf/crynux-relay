@@ -40,23 +40,13 @@ func InitDelegatorShareCache(ctx context.Context, db *gorm.DB) error {
 	globalDelegatorShareCache = &DelegatorShareCache{
 		delegatorShares: make(map[string]uint8),
 	}
-
-	offset := 0
-	limit := 100
-	for {
-		nodes, err := models.GetDelegatedNodes(ctx, db, offset, limit)
-		if err != nil {
-			return err
-		}
-		if len(nodes) == 0 {
-			break
-		}
-		for _, node := range nodes {
-			globalDelegatorShareCache.set(node.Address, node.DelegatorShare)
-		}
-		offset += len(nodes)
+	nodes, err := models.GetDelegatedNodes(ctx, db)
+	if err != nil {
+		return err
 	}
-
+	for _, node := range nodes {
+		globalDelegatorShareCache.set(node.Address, node.DelegatorShare)
+	}
 	return nil
 }
 

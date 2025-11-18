@@ -4,13 +4,13 @@ import (
 	"crynux_relay/api/v1/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"math/big"
+	"sort"
 
 	"github.com/gin-gonic/gin"
 )
 
 type GetDelegatedNodesInput struct {
-	Page     int `json:"page" query:"page" description:"page number" validate:"min=1" default:"1"`
-	PageSize int `json:"page_size" query:"page_size" description:"number of items per page" validate:"min=1,max=100" default:"30"`
 }
 
 type GetDelegatedNodesOutput struct {
@@ -19,16 +19,7 @@ type GetDelegatedNodesOutput struct {
 }
 
 func GetDelegatedNodes(c *gin.Context, input *GetDelegatedNodesInput) (*GetDelegatedNodesOutput, error) {
-	page := 1
-	if input.Page != 0 {
-		page = input.Page
-	}
-	pageSize := 30
-	if input.PageSize != 0 {
-		pageSize = input.PageSize
-	}
-
-	nodes, err := models.GetDelegatedNodes(c.Request.Context(), config.GetDB(), (page-1)*pageSize, pageSize)
+	nodes, err := models.GetDelegatedNodes(c.Request.Context(), config.GetDB())
 	if err != nil {
 		return nil, response.NewExceptionResponse(err)
 	}
@@ -56,6 +47,12 @@ func GetDelegatedNodes(c *gin.Context, input *GetDelegatedNodesInput) (*GetDeleg
 			return nil, response.NewExceptionResponse(err)
 		}
 	}
+
+	sort.Slice(nodeDatas, func(i, j int) bool {
+		earningI := new(big.Int).Add(&nodeDatas[i].TodayOperatorEarnings.Int, &nodeDatas[i].TodayDelegatorEarnings.Int)
+		earningJ := new(big.Int).Add(&nodeDatas[j].TodayOperatorEarnings.Int, &nodeDatas[j].TodayDelegatorEarnings.Int)
+		return earningI.Cmp(earningJ) > 0
+	})
 
 	return &GetDelegatedNodesOutput{
 		Data: nodeDatas,
