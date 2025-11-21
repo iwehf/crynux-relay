@@ -728,7 +728,7 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	events := []models.RelayAccountEvent{rewardEvent, daoEvent}
 
 	if totalDelegatorFee.Sign() > 0 {
-		userStakings := GetUserStakingsOfNode(address, network)
+		userStakings := GetDelegationsOfNode(address, network)
 		totalUserStakeAmount := big.NewInt(0)
 		for _, amount := range userStakings {
 			totalUserStakeAmount = totalUserStakeAmount.Add(totalUserStakeAmount, amount)

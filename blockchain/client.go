@@ -86,7 +86,7 @@ func initBlockchainClient(ctx context.Context, network string) error {
 		return err
 	}
 
-	userStakingInstance, err := bindings.NewUserStaking(common.HexToAddress(blockchain.Contracts.UserStaking), client)
+	userStakingInstance, err := bindings.NewDelegatedStaking(common.HexToAddress(blockchain.Contracts.DelegatedStaking), client)
 	if err != nil {
 		return err
 	}
