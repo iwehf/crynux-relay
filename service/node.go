@@ -211,10 +211,11 @@ func nodeSlash(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	}
 	taskIDCommitment := node.CurrentTaskIDCommitment.String
 	return db.Transaction(func(tx *gorm.DB) error {
+		slashedAmount := node.StakeAmount
 		if err := SetNodeStatusQuit(ctx, db, node, true); err != nil {
 			return err
 		}
-		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
+		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment, SlashedAmount: slashedAmount})
 	})
 }
 

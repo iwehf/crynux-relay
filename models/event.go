@@ -235,6 +235,7 @@ func (e *NodeKickedOutEvent) ToEvent() (*Event, error) {
 type NodeSlashedEvent struct {
 	NodeAddress      string `json:"node_address"`
 	TaskIDCommitment string `json:"task_id_commitment"`
+	SlashedAmount    BigInt `json:"slashed_amount"`
 }
 
 func (e *NodeSlashedEvent) ToEvent() (*Event, error) {
