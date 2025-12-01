@@ -58,7 +58,7 @@ func getDelegationsOfUser(ctx context.Context, db *gorm.DB, userAddress string, 
 	if err := dbi.Order("updated_at DESC").Offset(offset).Limit(limit).Find(&userStakings).Error; err != nil {
 		return nil, 0, err
 	}
-	return userStakings, 0, nil
+	return userStakings, total, nil
 }
 
 func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegationsOutput, error) {
@@ -122,7 +122,7 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 		}
 	}
 
-	var res []DelegationInfo
+	res := make([]DelegationInfo, 0)
 	for _, userStaking := range userStakings {
 		res = append(res, DelegationInfo{
 			UserAddress:   userStaking.DelegatorAddress,
