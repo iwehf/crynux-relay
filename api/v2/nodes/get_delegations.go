@@ -6,7 +6,6 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/models"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -53,9 +52,9 @@ func getDelegationsOfNode(ctx context.Context, db *gorm.DB, nodeAddress string, 
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	dbi := db.WithContext(dbCtx).Model(&models.Delegation{}).Where("node_address = ?", nodeAddress).Where("valid = ?", true)
+	dbi := db.WithContext(dbCtx).Model(&models.Delegation{}).Where("delegations.node_address = ?", nodeAddress).Where("delegations.valid = ?", true)
 	if network != nil {
-		dbi = dbi.Where("network = ?", network)
+		dbi = dbi.Where("delegations.network = ?", network)
 	}
 
 	var total int64
@@ -135,10 +134,6 @@ func GetDelegations(c *gin.Context, input *GetDelegationsInput) (*GetDelegations
 			TodayEarnings: todayEarningsMap[userStaking.UserAddress],
 		})
 	}
-
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].TotalEarnings.Cmp(&res[j].TotalEarnings.Int) > 0
-	})
 
 	return &GetDelegationsOutput{
 		Data: &DelegationsResult{
