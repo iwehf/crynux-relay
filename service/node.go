@@ -62,7 +62,7 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 		}).Create(&networkNodeData).Error; err != nil {
 			return err
 		}
-		if err := emitEvent(ctx, tx, &models.NodeJoinEvent{NodeAddress: node.Address}); err != nil {
+		if err := emitEvent(ctx, tx, &models.NodeJoinEvent{NodeAddress: node.Address, Network: node.Network}); err != nil {
 			return err
 		}
 		return nil
@@ -103,7 +103,7 @@ func SetNodeStatusQuit(ctx context.Context, db *gorm.DB, node *models.Node, slas
 				return err
 			}
 		}
-		if err := emitEvent(ctx, tx, &models.NodeQuitEvent{NodeAddress: node.Address, BlockchainTransactionID: blockchainTransaction.ID}); err != nil {
+		if err := emitEvent(ctx, tx, &models.NodeQuitEvent{NodeAddress: node.Address, BlockchainTransactionID: blockchainTransaction.ID, Network: node.Network}); err != nil {
 			return err
 		}
 		return nil
@@ -189,7 +189,7 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 			if err := SetNodeStatusQuit(ctx, tx, node, false); err != nil {
 				return err
 			}
-			return emitEvent(ctx, tx, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
+			return emitEvent(ctx, tx, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment, Network: node.Network})
 		}); err != nil {
 			return err
 		}
@@ -240,7 +240,7 @@ func nodeSlash(ctx context.Context, db *gorm.DB, node *models.Node) error {
 			return err
 		}
 		LogNodeStatusChange(node, "slashed")
-		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment, SlashedAmount: slashedAmount})
+		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment, Amount: slashedAmount, Network: node.Network})
 	})
 }
 
