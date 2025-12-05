@@ -603,7 +603,7 @@ func StartStatsNodeScores(ctx context.Context) {
 		log.Errorf("Stats: initial stats node scores error %v", err)
 	}
 
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(time.Minute)
 
 	for {
 		select {
@@ -613,7 +613,7 @@ func StartStatsNodeScores(ctx context.Context) {
 			ticker.Stop()
 		case <-ticker.C:
 			func() {
-				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)
+				ctx1, cancel := context.WithTimeout(ctx, time.Minute)
 				defer cancel()
 				if err := statsNodeScores(ctx1, interval); err != nil {
 					log.Errorf("Stats: stats node scores error %v", err)
@@ -707,11 +707,11 @@ func statsNodeStakings(ctx context.Context, interval time.Duration) error {
 }
 
 func StartStatsNodeStakings(ctx context.Context) {
-	interval := 4 * time.Hour
+	interval := 24 * time.Hour
 	if err := statsNodeStakings(ctx, interval); err != nil {
 		log.Errorf("Stats: initial stats node stakings error %v", err)
 	}
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(time.Minute)
 
 	for {
 		select {
@@ -721,7 +721,7 @@ func StartStatsNodeStakings(ctx context.Context) {
 			ticker.Stop()
 		case <-ticker.C:
 			func() {
-				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)
+				ctx1, cancel := context.WithTimeout(ctx, time.Minute)
 				defer cancel()
 				if err := statsNodeStakings(ctx1, interval); err != nil {
 					log.Errorf("Stats: stats node stakings error %v", err)
@@ -813,7 +813,7 @@ func StartStatsNodeDelegatorCount(ctx context.Context) {
 	if err := statsNodeDelegatorCount(ctx, interval); err != nil {
 		log.Errorf("Stats: initial stats node delegator count error %v", err)
 	}
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(time.Minute)
 
 	for {
 		select {
@@ -823,7 +823,7 @@ func StartStatsNodeDelegatorCount(ctx context.Context) {
 			ticker.Stop()
 		case <-ticker.C:
 			func() {
-				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)
+				ctx1, cancel := context.WithTimeout(ctx, time.Minute)
 				defer cancel()
 				if err := statsNodeDelegatorCount(ctx1, interval); err != nil {
 					log.Errorf("Stats: stats node delegator count error %v", err)
