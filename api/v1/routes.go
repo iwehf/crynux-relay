@@ -320,6 +320,10 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Connect wallet"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(client.ConnectWallet, 200))
+	clientGroup.GET("/:address/income/stats", []fizz.OperationOption{
+		fizz.Summary("Get client income stats"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetClientIncomeStats, 200))
 
 	delegatorGroup := v1g.Group("delegator", "delegator", "delegator related APIs")
 	delegatorGroup.GET("/:user_address/delegation", []fizz.OperationOption{
