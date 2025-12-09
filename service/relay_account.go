@@ -704,9 +704,9 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	totalDelegatorFee := big.NewInt(0)
 	delegatorShare := GetDelegatorShare(address)
 	if delegatorShare > 0 {
-		totalCommissionFee := totalDelegatorFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
-		totalCommissionFee.Div(totalCommissionFee, big.NewInt(100))
-		nodeIncome = nodeIncome.Sub(nodeIncome, totalCommissionFee)
+		totalDelegatorFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
+		totalDelegatorFee.Div(totalDelegatorFee, big.NewInt(100))
+		nodeIncome = nodeIncome.Sub(nodeIncome, totalDelegatorFee)
 	}
 
 	rewardEvent := models.RelayAccountEvent{
