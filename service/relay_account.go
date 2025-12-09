@@ -701,13 +701,7 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	daoTaskShare := big.NewInt(0).Mul(amount, big.NewInt(0).SetUint64(appConfig.Dao.TaskFeeSharePercent))
 	daoTaskShare.Div(daoTaskShare, big.NewInt(100))
 	nodeIncome := big.NewInt(0).Sub(amount, daoTaskShare)
-	totalDelegatorFee := big.NewInt(0)
 	delegatorShare := GetDelegatorShare(address)
-	if delegatorShare > 0 {
-		totalDelegatorFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
-		totalDelegatorFee.Div(totalDelegatorFee, big.NewInt(100))
-		nodeIncome = nodeIncome.Sub(nodeIncome, totalDelegatorFee)
-	}
 
 	rewardEvent := models.RelayAccountEvent{
 		Address:   address,
@@ -727,33 +721,40 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 	}
 	events := []models.RelayAccountEvent{rewardEvent, daoEvent}
 
-	if totalDelegatorFee.Sign() > 0 {
+	totalDelegatorFee := big.NewInt(0)
+	if delegatorShare > 0 {
 		userStakings := GetDelegationsOfNode(address, network)
-		totalUserStakeAmount := big.NewInt(0)
-		for _, amount := range userStakings {
-			totalUserStakeAmount = totalUserStakeAmount.Add(totalUserStakeAmount, amount)
-		}
-		userAddresses := make([]string, 0, len(userStakings))
-		userDelegatorFees := make([]*big.Int, 0, len(userStakings))
-		dispatchedDelegatorFee := big.NewInt(0)
-		for userAddress, userStakingAmount := range userStakings {
-			userAddresses = append(userAddresses, userAddress)
-			delegatorFee := big.NewInt(0).Mul(totalDelegatorFee, userStakingAmount)
-			delegatorFee = delegatorFee.Div(delegatorFee, totalUserStakeAmount)
-			userDelegatorFees = append(userDelegatorFees, delegatorFee)
-			dispatchedDelegatorFee = dispatchedDelegatorFee.Add(dispatchedDelegatorFee, delegatorFee)
-		}
-		userDelegatorFees[0].Add(userDelegatorFees[0], big.NewInt(0).Sub(totalDelegatorFee, dispatchedDelegatorFee))
+		if len(userStakings) > 0 {
+			totalDelegatorFee.Mul(nodeIncome, big.NewInt(int64(delegatorShare)))
+			totalDelegatorFee.Div(totalDelegatorFee, big.NewInt(100))
+			nodeIncome = nodeIncome.Sub(nodeIncome, totalDelegatorFee)
 
-		for i := range len(userStakings) {
-			events = append(events, models.RelayAccountEvent{
-				Address:   userAddresses[i],
-				Amount:    models.BigInt{Int: *userDelegatorFees[i]},
-				CreatedAt: time.Now(),
-				Status:    models.RelayAccountEventStatusPending,
-				Type:      models.RelayAccountEventTypeUserDelegation,
-				Reason:    fmt.Sprintf("%d-%s", models.RelayAccountEventTypeUserDelegation, taskIDCommitment),
-			})
+			totalUserStakeAmount := big.NewInt(0)
+			for _, amount := range userStakings {
+				totalUserStakeAmount = totalUserStakeAmount.Add(totalUserStakeAmount, amount)
+			}
+			userAddresses := make([]string, 0, len(userStakings))
+			userDelegatorFees := make([]*big.Int, 0, len(userStakings))
+			dispatchedDelegatorFee := big.NewInt(0)
+			for userAddress, userStakingAmount := range userStakings {
+				userAddresses = append(userAddresses, userAddress)
+				delegatorFee := big.NewInt(0).Mul(totalDelegatorFee, userStakingAmount)
+				delegatorFee = delegatorFee.Div(delegatorFee, totalUserStakeAmount)
+				userDelegatorFees = append(userDelegatorFees, delegatorFee)
+				dispatchedDelegatorFee = dispatchedDelegatorFee.Add(dispatchedDelegatorFee, delegatorFee)
+			}
+			userDelegatorFees[0].Add(userDelegatorFees[0], big.NewInt(0).Sub(totalDelegatorFee, dispatchedDelegatorFee))
+
+			for i := range len(userStakings) {
+				events = append(events, models.RelayAccountEvent{
+					Address:   userAddresses[i],
+					Amount:    models.BigInt{Int: *userDelegatorFees[i]},
+					CreatedAt: time.Now(),
+					Status:    models.RelayAccountEventStatusPending,
+					Type:      models.RelayAccountEventTypeUserDelegation,
+					Reason:    fmt.Sprintf("%d-%s", models.RelayAccountEventTypeUserDelegation, taskIDCommitment),
+				})
+			}
 		}
 	}
 	incentive, _ := utils.WeiToEther(nodeIncome).Float64()
