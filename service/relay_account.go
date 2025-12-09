@@ -34,7 +34,7 @@ var relayAccountCache = &relayAccountCacheType{
 
 func splitRelayAccountEventReason(eventType models.RelayAccountEventType, reason string) ([]string, bool) {
 	eventTypeStr := fmt.Sprintf("%d", eventType)
-	if eventType == models.RelayAccountEventTypeDeposit {
+	if eventType == models.RelayAccountEventTypeDeposit || eventType == models.RelayAccountEventTypeUserDelegation {
 		parts := strings.SplitN(reason, "-", 3)
 		if len(parts) != 3 || parts[0] != eventTypeStr {
 			return nil, false
@@ -752,7 +752,7 @@ func sendTaskIncome(ctx context.Context, db *gorm.DB, taskIDCommitment, address 
 					CreatedAt: time.Now(),
 					Status:    models.RelayAccountEventStatusPending,
 					Type:      models.RelayAccountEventTypeUserDelegation,
-					Reason:    fmt.Sprintf("%d-%s", models.RelayAccountEventTypeUserDelegation, taskIDCommitment),
+					Reason:    fmt.Sprintf("%d-%s-%s", models.RelayAccountEventTypeUserDelegation, taskIDCommitment, userAddresses[i]),
 				})
 			}
 		}
