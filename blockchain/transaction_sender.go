@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"context"
+	"crynux_relay/config"
 	"crynux_relay/models"
 	"fmt"
 	"math/big"
@@ -157,11 +158,27 @@ func (ts *TransactionSender) sendTransaction(ctx context.Context, transaction *m
 		return nil
 	}
 
+	appConfig := config.GetConfig()
+	blockchain, ok := appConfig.Blockchains[transaction.Network]
+	if !ok {
+		return fmt.Errorf("network %s not found", transaction.Network)
+	}
+
+	waitDeadline := transaction.CreatedAt.Add(time.Duration(blockchain.SendWaitTime) * time.Second)
+	if time.Now().After(waitDeadline) {
+		log.Warnf("Transaction %d has waited too long for sending", transaction.ID)
+		if err := ts.handleTimedOutTransaction(ctx, transaction); err != nil {
+			log.Errorf("Failed to handle timed out transaction: %v", err)
+			return err
+		}
+		return nil
+	}
+
 	sentTransactionCount, err := models.GetSentTransactionCountByNetwork(ctx, ts.db, transaction.Network)
 	if err != nil {
 		return err
 	}
-	
+
 	client, err := GetBlockchainClient(transaction.Network)
 	if err != nil {
 		return err
@@ -252,4 +269,13 @@ func (ts *TransactionSender) sendRawTransaction(ctx context.Context, client *Blo
 	}
 
 	return signedTx.Hash().Hex(), nil
+}
+
+func (ts *TransactionSender) handleTimedOutTransaction(ctx context.Context, transaction *models.BlockchainTransaction) error {
+	if err := transaction.MarkFailed(ctx, ts.db, 0, 0, "", "Transaction send timeout"); err != nil {
+		return err
+	}
+	log.Infof("Transaction %d send timeout", transaction.ID)
+
+	return nil
 }
