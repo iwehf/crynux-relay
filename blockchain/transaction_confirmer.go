@@ -257,7 +257,7 @@ func (tc *TransactionConfirmer) handleFailedTransaction(ctx context.Context, cli
 
 func (tc *TransactionConfirmer) handleTimedOutTransaction(ctx context.Context, transaction *models.BlockchainTransaction) error {
 	if err := tc.db.Transaction(func(tx *gorm.DB) error {
-		if err := transaction.MarkFailed(ctx, tx, 0, 0, "", "Transaction timed out"); err != nil {
+		if err := transaction.MarkFailed(ctx, tx, 0, 0, "", "Transaction wait receipt timeout"); err != nil {
 			return err
 		}
 		if transaction.RetryCount < transaction.MaxRetries {
@@ -269,7 +269,7 @@ func (tc *TransactionConfirmer) handleTimedOutTransaction(ctx context.Context, t
 	}); err != nil {
 		return err
 	}
-	log.Infof("Transaction %d timed out, will retry (attempt %d/%d)", transaction.ID, transaction.RetryCount+1, transaction.MaxRetries)
+	log.Infof("Transaction %d wait receipt timeout, will retry (attempt %d/%d)", transaction.ID, transaction.RetryCount+1, transaction.MaxRetries)
 
 	return nil
 }
