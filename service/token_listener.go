@@ -114,13 +114,8 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 
 	// Check transactions in the block
 	for _, txHash := range txHashes {
-		tx, _, err := client.RpcClient.TransactionByHash(ctx, common.HexToHash(txHash))
-		if err != nil {
-			log.Errorf("Failed to get transaction %s: %v", txHash, err)
-			return err
-		}
-		if err := processTransaction(ctx, db, tx, client); err != nil {
-			log.Errorf("Failed to process transaction %s: %v", tx.Hash().Hex(), err)
+		if err := processTransaction(ctx, db, common.HexToHash(txHash), client); err != nil {
+			log.Errorf("Failed to process transaction %s: %v", txHash, err)
 			return err
 		}
 	}
@@ -128,12 +123,12 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 	return nil
 }
 
-func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient) error {
+func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, tx *types.Transaction, client *blockchain.BlockchainClient) error {
 
 	// Check if transaction is successful
-	receipt, err := client.RpcClient.TransactionReceipt(ctx, tx.Hash())
+	receipt, err := client.RpcClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
-		return fmt.Errorf("failed to get transaction receipt of %s, network: %s, error: %w", tx.Hash().Hex(), client.Network, err)
+		return fmt.Errorf("failed to get transaction receipt of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
 	}
 
 	if receipt.Status != types.ReceiptStatusSuccessful {
@@ -141,7 +136,7 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Tran
 	}
 
 	// Check if already processed
-	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, tx.Hash().Hex(), client.Network)
+	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, txHash.Hex(), client.Network)
 	if err != nil {
 		return err
 	}
@@ -152,11 +147,11 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Tran
 	// Get sender address (need to recover from signature)
 	from, err := types.Sender(types.LatestSignerForChainID(client.ChainID), tx)
 	if err != nil {
-		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", tx.Hash().Hex(), client.Network, err)
+		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
 	}
 
 	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := buyTaskQuota(ctx, db, tx.Hash().Hex(), from.Hex(), tx.Value(), client.Network)
+	commitFunc, err := buyTaskQuota(ctx, db, txHash.Hex(), from.Hex(), tx.Value(), client.Network)
 	if err != nil {
 		log.Errorf("Failed to buy task quota for %s, network: %s, error: %v", from.Hex(), client.Network, err)
 		return err
@@ -170,11 +165,11 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, tx *types.Tran
 	return nil
 }
 
-func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient) error {
+func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, tx *types.Transaction, client *blockchain.BlockchainClient) error {
 	// Check if transaction is successful
-	receipt, err := client.RpcClient.TransactionReceipt(ctx, tx.Hash())
+	receipt, err := client.RpcClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
-		return fmt.Errorf("failed to get transaction receipt of %s, network: %s, error: %w", tx.Hash().Hex(), client.Network, err)
+		return fmt.Errorf("failed to get transaction receipt of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
 	}
 
 	if receipt.Status != types.ReceiptStatusSuccessful {
@@ -182,7 +177,7 @@ func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, tx *types.Tr
 	}
 
 	// Check if already processed
-	event, err := models.GetTaskFeeBoughtEvent(ctx, db, tx.Hash().Hex(), client.Network)
+	event, err := models.GetTaskFeeBoughtEvent(ctx, db, txHash.Hex(), client.Network)
 	if err != nil {
 		return err
 	}
@@ -193,11 +188,11 @@ func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, tx *types.Tr
 	// Get sender address (need to recover from signature)
 	from, err := types.Sender(types.LatestSignerForChainID(client.ChainID), tx)
 	if err != nil {
-		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", tx.Hash().Hex(), client.Network, err)
+		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
 	}
 
 	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := buyTaskFee(ctx, db, tx.Hash().Hex(), from.Hex(), tx.Value(), client.Network)
+	commitFunc, err := buyTaskFee(ctx, db, txHash.Hex(), from.Hex(), tx.Value(), client.Network)
 	if err != nil {
 		log.Errorf("Failed to buy task fee for %s, network: %s, error: %v", from.Hex(), client.Network, err)
 		return err
@@ -212,7 +207,12 @@ func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, tx *types.Tr
 }
 
 // processTransaction processes a single transaction
-func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction, client *blockchain.BlockchainClient) error {
+func processTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, client *blockchain.BlockchainClient) error {
+	tx, _, err := client.RpcClient.TransactionByHash(ctx, txHash)
+	if err != nil {
+		return fmt.Errorf("failed to get transaction %s: %w", txHash.Hex(), err)
+	}
+
 	// Only process native token transfers (to field is not empty and data field is empty)
 	if tx.To() == nil || len(tx.Data()) > 0 {
 		return nil
@@ -222,9 +222,9 @@ func processTransaction(ctx context.Context, db *gorm.DB, tx *types.Transaction,
 
 	// Check if transfer is to the target address
 	if strings.EqualFold(tx.To().Hex(), appConfig.BuyQuota.Address) {
-		return processBuyQuotaTransaction(ctx, db, tx, client)
+		return processBuyQuotaTransaction(ctx, db, txHash, tx, client)
 	} else if strings.EqualFold(tx.To().Hex(), appConfig.BuyTaskFee.Address) {
-		return processBuyTaskFeeTransaction(ctx, db, tx, client)
+		return processBuyTaskFeeTransaction(ctx, db, txHash, tx, client)
 	}
 
 	return nil
