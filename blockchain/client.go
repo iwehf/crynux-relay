@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"gorm.io/gorm"
@@ -30,6 +31,7 @@ import (
 type BlockchainClient struct {
 	Network                        string
 	RpcClient                      *ethclient.Client
+	RpcEndpoint                    string
 	BenefitAddressContractInstance *bindings.BenefitAddress
 	NodeStakingContractInstance    *bindings.NodeStaking
 	CreditsContractInstance        *bindings.Credits
@@ -103,6 +105,7 @@ func initBlockchainClient(ctx context.Context, network string) error {
 	blockchainClients[network] = &BlockchainClient{
 		Network:                        network,
 		RpcClient:                      client,
+		RpcEndpoint:                    blockchain.RpcEndpoint,
 		BenefitAddressContractInstance: benefitAddressInstance,
 		NodeStakingContractInstance:    nodeStakingInstance,
 		CreditsContractInstance:        creditsInstance,
@@ -363,4 +366,25 @@ func unpackError(result []byte) (string, error) {
 	}
 
 	return vs[0].(string), nil
+}
+
+type rpcBlock struct {
+	Transactions []string `json:"transactions"`
+}
+
+
+func (client *BlockchainClient) GetTransactionHashesFromBlock(ctx context.Context, blockNumber *big.Int) ([]string, error) {
+	rpcClient, err := rpc.Dial(client.RpcEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer rpcClient.Close()
+
+	var rpcBlock rpcBlock
+	err = rpcClient.CallContext(ctx, &rpcBlock, "eth_getBlockByNumber", blockNumber.String(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	return rpcBlock.Transactions, nil
 }
