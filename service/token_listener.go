@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	log "github.com/sirupsen/logrus"
 
@@ -106,13 +107,18 @@ func processNewBlocks(ctx context.Context, db *gorm.DB, client *blockchain.Block
 
 // processBlock processes a single block
 func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.BlockchainClient, blockNum uint64) error {
-	block, err := client.RpcClient.BlockByNumber(ctx, big.NewInt(int64(blockNum)))
+	txHashes, err := client.GetTransactionHashesFromBlock(ctx, big.NewInt(int64(blockNum)))
 	if err != nil {
 		return fmt.Errorf("failed to get block %d: %w", blockNum, err)
 	}
 
 	// Check transactions in the block
-	for _, tx := range block.Transactions() {
+	for _, txHash := range txHashes {
+		tx, _, err := client.RpcClient.TransactionByHash(ctx, common.HexToHash(txHash))
+		if err != nil {
+			log.Errorf("Failed to get transaction %s: %v", txHash, err)
+			return err
+		}
 		if err := processTransaction(ctx, db, tx, client); err != nil {
 			log.Errorf("Failed to process transaction %s: %v", tx.Hash().Hex(), err)
 			return err
