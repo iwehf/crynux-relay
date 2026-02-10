@@ -30,16 +30,6 @@ func InitConfig(configPath string) error {
 		return err
 	}
 
-	// Node health defaults
-	v.SetDefault("node_health.penalty_factor", 0.3)
-	v.SetDefault("node_health.success_boost", 0.15)
-	v.SetDefault("node_health.recovery_tau_minutes", 30.0)
-	v.SetDefault("node_health.exclude_threshold", 0.1)
-
-	// QoS defaults
-	v.SetDefault("qos.score_pool_size", 50)
-	v.SetDefault("qos.kickout_threshold", 2.0)
-
 	appConfig = &AppConfig{}
 
 	if err := v.Unmarshal(appConfig); err != nil {
