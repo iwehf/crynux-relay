@@ -27,6 +27,8 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 	err = db.Transaction(func(tx *gorm.DB) error {
 		node.Status = models.NodeStatusAvailable
 		node.JoinTime = time.Now()
+		node.HealthBase = 1.0
+		node.HealthUpdatedAt = sql.NullTime{Time: time.Now(), Valid: true}
 		if err := node.Save(ctx, tx); err != nil {
 			return err
 		}
@@ -170,11 +172,9 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		return errors.New("task id commitment is not valid")
 	}
 	taskIDCommitment := node.CurrentTaskIDCommitment.String
-	kickout, err := shouldKickoutNode(ctx, node)
-	if err != nil {
-		return err
-	}
-	if kickout {
+
+	// QoS-based permanent kickout check
+	if ShouldPermanentKickout(node) {
 		return db.Transaction(func(tx *gorm.DB) error {
 			if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
 				return err

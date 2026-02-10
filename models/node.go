@@ -35,6 +35,8 @@ type Node struct {
 	PatchVersion            uint64         `json:"patch_version"`
 	JoinTime                time.Time      `json:"join_time"`
 	StakeAmount             BigInt         `json:"stake_amount"`
+	HealthBase              float64        `json:"health_base" gorm:"default:1.0"`
+	HealthUpdatedAt         sql.NullTime   `json:"health_updated_at" gorm:"null;default:null"`
 	CurrentTaskIDCommitment sql.NullString `json:"current_task_id_commitment" gorm:"null;default:null"`
 	CurrentTask             InferenceTask  `json:"-" gorm:"foreignKey:TaskIDCommitment;references:CurrentTaskIDCommitment"`
 	Models                  []NodeModel    `json:"-" gorm:"foreignKey:NodeAddress;references:Address"`

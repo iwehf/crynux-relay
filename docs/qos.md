@@ -1,6 +1,6 @@
 # Quality of Service (QoS) Implementation
 
-This document describes the actual QoS implementation in the Crynux Relay codebase, and highlights the differences from the [official documentation](https://docs.crynux.io/system-design/quality-of-service-qos).
+This document describes the QoS implementation in the Crynux Relay codebase.
 
 ## Overview
 
@@ -9,8 +9,10 @@ The QoS system incentivizes nodes to perform well by:
 1. Assigning **Task Scores** to individual tasks based on execution speed.
 2. Maintaining a **Node QoS Score** as a rolling average of recent task scores.
 3. Using the Node QoS Score to influence **node selection probability** for future tasks.
-4. **Kicking out** nodes that consistently time out.
+4. **Permanently kicking out** nodes whose QoS score drops below a threshold.
 5. Distributing **rewards proportionally** to task scores within grouped tasks.
+
+For the short-term **health multiplier** system that temporarily penalizes nodes on timeout failures, see [node_health.md](node_health.md).
 
 ## Task Grouping (Validation Tasks)
 
@@ -167,49 +169,22 @@ For a detailed description of this mechanism, including the spreading logic, nod
 
 The actual node selection uses weighted random sampling (`gonum/stat/sampleuv.NewWeighted`), where each node's weight is its computed probability. This is a probabilistic selection, not deterministic - higher-weighted nodes are more likely to be selected, but any eligible node can be chosen.
 
-## Node Kickout
+## Permanent Kickout
 
-The kickout mechanism automatically removes nodes that consistently fail to complete tasks. It is a **separate system from QoS scoring** -- it does not use the QoS score or the 50-task rolling pool at all. Instead, it directly queries the database for the node's recent task history and checks for timeout patterns.
-
-### Relationship to QoS Score
-
-The QoS score and the kickout mechanism are completely independent:
-
-| | QoS Score (Rolling Pool) | Kickout Check |
-|---|---|---|
-| **Data source** | In-memory 50-entry rolling pool | Database query (last 3 tasks) |
-| **Scope** | Grouped (validation) tasks only | All tasks (grouped and single) |
-| **Constant** | `NODE_QOS_SCORE_POOL_SIZE = 50` | `TASK_SCORE_POOL_SIZE = 3` |
-| **Effect** | Influences node selection probability | Determines whether node is removed |
-
-A non-grouped task that times out will **not** affect the node's QoS score (because `QOSScore` is only assigned during `ValidateTaskGroup`, and the `updateNodeQosScore` call is guarded by `task.QOSScore.Valid`). However, it **does count** toward the kickout threshold.
+The permanent kickout mechanism removes nodes whose QoS score demonstrates sustained poor performance. It uses the same 50-task rolling average QoS score described above.
 
 ### Kickout Criteria
 
-The kickout check (`shouldKickoutNode`) queries the node's **most recent 3 tasks** from the database:
+The kickout check (`ShouldPermanentKickout` in `service/qos.go`) evaluates two conditions, both of which must be true:
 
-```go
-// service/qos.go
-const (
-    TASK_SCORE_POOL_SIZE uint64 = 3
-    KickoutThreshold     uint64 = 2
-)
-```
+1. The node's QoS score is below the configured `qos.kickout_threshold` (default: 2.0).
+2. The QoS score pool has accumulated enough samples (equal to `qos.score_pool_size`, default: 50).
 
-The query is `WHERE selected_node = ? ORDER BY id DESC LIMIT 3`, which includes **all** tasks assigned to the node regardless of whether they are grouped or single.
-
-A task counts as a "timeout failure" if ALL of the following are true:
-
-1. The task has a valid `StartTime` (it was actually started, not just queued).
-2. The task started **after** the node's `JoinTime` (tasks from before the node re-joined are excluded, so old history does not carry over).
-3. The task status is `TaskEndAborted` with abort reason `TaskAbortTimeout`.
-4. The task's `ScoreReadyTime` is **not valid** (the node never submitted a result before the timeout).
-
-If **2 or more** of the last 3 tasks meet all these criteria, the node is kicked out.
+The second condition prevents premature kickout of nodes that have only completed a few grouped tasks — the system waits until there is a statistically meaningful sample before making a permanent removal decision.
 
 ### When the Kickout Check Runs
 
-The check happens inside `nodeFinishTask`, which is called every time a node completes processing a task -- whether the outcome is success, group refund, or abort. This means the kickout evaluation runs on every task completion, not just on timeouts.
+The check happens inside `nodeFinishTask`, which is called every time a node completes processing a task — whether the outcome is success, group refund, or abort.
 
 ### Kickout Execution
 
@@ -217,8 +192,14 @@ If the kickout condition is met:
 
 1. The node's status is set to quit.
 2. All of the node's local model records are deleted.
-3. An unstake transaction is queued on the blockchain (the node is **not slashed** -- its stake is returned).
+3. An unstake transaction is queued on the blockchain (the node is **not slashed** — its stake is returned).
 4. A `NodeKickedOutEvent` is emitted.
+
+### Interaction with Application-Caused Failures
+
+When an invalid application task causes ALL nodes in a validation group to timeout, the QoS scores for that group are set to NULL and **excluded from the rolling average**. This means application-caused failures do not drag down a node's QoS score. Only genuine node-specific failures — where the node times out but other nodes in the same group succeed (receiving a QoS score of 0) — affect the score.
+
+Since QoS scores only cover grouped (validation) tasks (~1% of all tasks), the permanent kickout is a long-term backstop that catches nodes whose failures are consistently their own fault. For short-term timeout penalty and temporary exclusion, see the [health multiplier](node_health.md).
 
 ## Reward Distribution for Grouped Tasks
 
@@ -304,14 +285,13 @@ Task Creator uploads result -> EndGroupSuccess
 Rewards distributed proportionally to task QoS scores
 ```
 
-## Key Constants
+## Key Constants and Config
 
-| Constant | Value | Description |
-|----------|-------|-------------|
+| Constant / Config | Value | Description |
+|-------------------|-------|-------------|
 | `TASK_SCORE_REWARDS` | [10, 5, 2] | Task scores for 1st, 2nd, 3rd place |
-| `NODE_QOS_SCORE_POOL_SIZE` | 50 | Rolling pool size for node QoS calculation |
-| `TASK_SCORE_POOL_SIZE` | 3 | Number of recent tasks checked for kickout |
-| `KickoutThreshold` | 2 | Number of timeouts in recent tasks to trigger kickout |
+| `qos.score_pool_size` | 50 (default) | Rolling pool size for node QoS calculation |
+| `qos.kickout_threshold` | 2.0 (default) | QoS score below which a node is permanently kicked out |
 | `maxQoSScore` | 10.0 | Fixed normalization denominator for QoS score |
 | Default QoS Prob | 0.5 | Fallback when QoS probability is 0 |
 
@@ -319,14 +299,15 @@ Rewards distributed proportionally to task QoS scores
 
 | File | Description |
 |------|-------------|
-| `service/qos.go` | Core QoS logic: task score assignment, rolling pool, kickout check |
+| `service/qos.go` | Core QoS logic: task score assignment, rolling pool, permanent kickout check |
+| `service/health.go` | Health multiplier: penalty, boost, effective health calculation |
 | `service/selecting_prob.go` | Selection probability calculation (staking + QoS) |
 | `service/validate_task.go` | Task group validation and QoS score assignment |
-| `service/task_status.go` | Task state transitions and QoS updates |
-| `service/select_nodes.go` | Node selection using QoS-weighted probability |
+| `service/task_status.go` | Task state transitions, QoS updates, health penalty/boost |
+| `service/select_nodes.go` | Node selection using QoS-weighted probability * health multiplier |
 | `service/node.go` | Node management, QoS persistence, kickout execution |
 | `models/inference_task.go` | Task model with QOSScore field and ExecutionTime method |
-| `models/node.go` | Node model with QOSScore field |
+| `models/node.go` | Node model with QOSScore, HealthBase, HealthUpdatedAt fields |
 | `models/network.go` | NetworkNodeData with QoS field (synced periodically) |
 | `tasks/sync_network.go` | Background task syncing node QoS to network statistics |
 | `utils/vrf.go` | VRF validation check for task grouping |
