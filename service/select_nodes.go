@@ -156,18 +156,13 @@ func selectNodeForInferenceTask(ctx context.Context, task *models.InferenceTask)
 	if len(nodes) == 0 {
 		return nil, nil
 	}
-	excludeThreshold := config.GetConfig().NodeHealth.ExcludeThreshold
+
 	maxStaking := GetMaxStaking()
-	maxQosScore := GetMaxQosScore()
 	scores := make([]float64, len(nodes))
 	for i, node := range nodes {
-		_, _, prob := CalculateSelectingProb(&node.StakeAmount.Int, maxStaking, node.QOSScore, maxQosScore)
-		h := GetEffectiveHealth(&node)
-		if h < excludeThreshold {
-			scores[i] = 0 // hard exclusion
-		} else {
-			scores[i] = prob * h
-		}
+		qos := CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
+		_, _, prob := CalculateSelectingProb(&node.StakeAmount.Int, maxStaking, qos)
+		scores[i] = prob
 	}
 
 	changedNodes := make([]models.Node, 0)
@@ -243,18 +238,13 @@ func selectNodesForDownloadTask(ctx context.Context, task *models.InferenceTask,
 	if len(validNodes) == 0 {
 		return nil, nil
 	}
-	dlExcludeThreshold := config.GetConfig().NodeHealth.ExcludeThreshold
+
 	maxStaking := GetMaxStaking()
-	maxQosScore := GetMaxQosScore()
 	scores := make([]float64, len(validNodes))
 	for i, node := range validNodes {
-		_, _, prob := CalculateSelectingProb(&node.StakeAmount.Int, maxStaking, node.QOSScore, maxQosScore)
-		h := GetEffectiveHealth(&node)
-		if h < dlExcludeThreshold {
-			scores[i] = 0 // hard exclusion
-		} else {
-			scores[i] = prob * h
-		}
+		qos := CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
+		_, _, prob := CalculateSelectingProb(&node.StakeAmount.Int, maxStaking, qos)
+		scores[i] = prob
 	}
 
 	res := selectNodesByScore(validNodes, scores, n)

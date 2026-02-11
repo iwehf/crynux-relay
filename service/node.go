@@ -41,15 +41,17 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 			return err
 		}
 		networkNodeData := models.NetworkNodeData{
-			Address:   node.Address,
-			CardModel: node.GPUName,
-			VRam:      int(node.GPUVram),
-			QoS:       node.QOSScore,
-			Staking:   node.StakeAmount,
+			Address:         node.Address,
+			CardModel:       node.GPUName,
+			VRam:            int(node.GPUVram),
+			QoS:             node.QOSScore,
+			Staking:         node.StakeAmount,
+			HealthBase:      node.HealthBase,
+			HealthUpdatedAt: node.HealthUpdatedAt,
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "address"}},
-			DoUpdates: clause.AssignmentColumns([]string{"card_model", "v_ram", "qo_s", "staking", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"card_model", "v_ram", "qo_s", "staking", "health_base", "health_updated_at", "updated_at"}),
 		}).Create(&networkNodeData).Error; err != nil {
 			return err
 		}

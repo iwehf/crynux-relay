@@ -121,7 +121,8 @@ func GetNodeIncentive(c *gin.Context, input *GetNodeIncentiveParams) (*GetNodeIn
 	for _, node := range nodes {
 
 		if nodeIncentive, ok := nodeIncentiveMap[node.Address]; ok {
-			stakingProb, qosProb, prob := service.CalculateSelectingProb(&node.Staking.Int, service.GetMaxStaking(), node.QoS, service.GetMaxQosScore())
+			qos := service.CalculateQosScore(node.QoS, node.HealthBase, node.HealthUpdatedAt)
+			stakingProb, qosProb, prob := service.CalculateSelectingProb(&node.Staking.Int, service.GetMaxStaking(), qos)
 			nodeIncentive.CardModel = node.CardModel
 			nodeIncentive.VRam = node.VRam
 			nodeIncentive.QOSScore = qosProb
@@ -275,7 +276,8 @@ func GetAllNodeIncentive(c *gin.Context, input *GetAllNodeIncentiveParamsWithSig
 	for _, node := range nodes {
 
 		if nodeIncentive, ok := nodeIncentiveMap[node.Address]; ok {
-			stakingProb, qosProb, prob := service.CalculateSelectingProb(&node.Staking.Int, service.GetMaxStaking(), node.QoS, service.GetMaxQosScore())
+			qos := service.CalculateQosScore(node.QoS, node.HealthBase, node.HealthUpdatedAt)
+			stakingProb, qosProb, prob := service.CalculateSelectingProb(&node.Staking.Int, service.GetMaxStaking(), qos)
 			nodeIncentive.CardModel = node.CardModel
 			nodeIncentive.VRam = node.VRam
 			nodeIncentive.QOSScore = qosProb

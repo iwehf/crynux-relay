@@ -4,53 +4,60 @@ This document describes the QoS implementation in the Crynux Relay codebase.
 
 ## Overview
 
-The QoS system incentivizes nodes to perform well by:
+The QoS (Quality of Service) system is designed to improve network service quality by rewarding nodes that deliver faster execution and reliable availability, while reducing the impact of nodes that frequently fail or time out.
 
-1. Assigning **Task Scores** to individual tasks based on execution speed.
-2. Maintaining a **Node QoS Score** as a rolling average of recent task scores.
-3. Using the Node QoS Score to influence **node selection probability** for future tasks.
-4. **Permanently kicking out** nodes whose QoS score drops below a threshold.
-5. Distributing **rewards proportionally** to task scores within grouped tasks.
+The QoS score is updated continuously as a node executes tasks and is used as an input to network decisions such as task allocation preference and reliability protection mechanisms.
 
-For the short-term **health multiplier** system that temporarily penalizes nodes on timeout failures, see [node_health.md](node_health.md).
+At its core, QoS is intentionally split across two time scales: a long-term performance component derived from task completion speed (`Q_long`), and a short-term reliability component (`H`) that reacts quickly to timeouts but can recover after sustained success.
 
-## Task Grouping (Validation Tasks)
+## Naming Clarification (Code vs Concepts)
 
-Not all tasks go through QoS scoring. Only **grouped tasks** (validation tasks) receive QoS scores.
+In the codebase, "QoS" may refer to either the persisted long-term performance score or the final runtime QoS used for selection. The mapping below is the source of truth:
 
-A VRF (Verifiable Random Function) determines whether a task requires validation. The task creator generates a VRF proof, and the relay verifies it. The selection logic is:
+| Code Symbol | Actual Meaning |
+|-------------|----------------|
+| `models.Node.QOSScore` | `Q_long`, the persisted long-term performance score (not the final runtime QoS) |
+| `CalculateQosScore(qosScore, healthBase, healthUpdatedAt)` parameter `qosScore` | `Q_long` loaded from `models.Node.QOSScore` |
+| `CalculateQosScore(...)` return value | final runtime QoS used for selection (after hard exclusion) |
 
-```go
-// utils/vrf.go
-func VrfNeedValidation(vrfNumber []byte) bool {
-    number := big.NewInt(0).SetBytes(vrfNumber)
-    r := big.NewInt(0).Mod(number, big.NewInt(100)).Uint64()
-    return r == 0
-}
-```
+In short: the database field named `QOSScore` stores long-term performance only, while the final runtime QoS is computed by combining normalized `Q_long` with effective health `H`.
 
-This means approximately **1% of tasks** are selected for validation grouping. A grouped task is executed by **3 different nodes** simultaneously. Single (non-grouped) tasks are not scored for QoS.
+## QoS Score Definition
 
-## Task Score
+The final runtime QoS score evaluates node quality through two factors that operate at different time scales:
 
-When a grouped task is validated, each of the 3 tasks in the group receives a **Task Score** based on execution speed.
+- **Long-term performance factor**: A rolling average of recent validation task scores that captures whether a node is consistently fast.
+- **Short-term reliability factor**: A multiplier that reacts immediately to timeout failures, capturing whether a node is currently dependable.
 
-### Execution Time Measurement
-
-Execution time is measured as:
+The final QoS score for a node is the product of both factors:
 
 ```
-ExecutionTime = ScoreReadyTime - StartTime
+QoS = (Q_long / Q_max) * H
 ```
 
-- `StartTime`: when the task was assigned to the node and started.
-- `ScoreReadyTime`: when the node submitted its result score (hash).
+Where:
+- `Q_long`: the node's long-term performance score (rolling average of task scores).
+- `Q_max`: the maximum possible task score (10.0).
+- `H`: the short-term reliability factor (range 0 to 1).
 
-If either timestamp is missing, the execution time is set to the maximum possible duration (effectively infinite).
+If `Q_long` is 0 (e.g., for a new node), it defaults to `5.0` (half of `Q_max`) before applying `H`.
 
-### Score Assignment
+## Factor Calculation
 
-Tasks within a group are sorted by execution time (fastest first). If two tasks have the same execution time, they are sorted by database ID (lower ID first). The fixed score values are:
+This section explains how `Q_long` and `H` are computed.
+### Long-term Performance Score (`Q_long`)
+
+`Q_long` measures a node's sustained execution speed across its recent validation tasks. It changes gradually and reflects the node's typical hardware and network quality.
+
+#### Task Grouping (Validation Tasks)
+
+Not all tasks contribute to `Q_long`. Only **grouped tasks** (validation tasks) receive Task Scores that enter the rolling pool. A grouped task is executed by **3 different nodes** simultaneously. Single (non-grouped) tasks do not generate Task Scores for `Q_long` (though they do influence the short-term reliability factor via successful completion or timeout).
+
+#### Task Score
+
+When a grouped task is validated, each of the 3 tasks in the group receives a **Task Score** based on execution speed (SubmissionTime - StartTime).
+
+Tasks within a group are sorted by execution time (fastest first). The fixed score values are:
 
 | Completion Order | Task Score |
 |-----------------|------------|
@@ -58,327 +65,69 @@ Tasks within a group are sorted by execution time (fastest first). If two tasks 
 | 2nd             | 5          |
 | 3rd (slowest)   | 2          |
 
-These values are defined as:
-
-```go
-// service/qos.go
-TASK_SCORE_REWARDS [3]uint64 = [3]uint64{10, 5, 2}
-```
-
 Special cases:
 - Tasks that were **aborted** before the group validation receive a score of **0**.
 - If **all 3 tasks** in a group are aborted, QoS scores are set to NULL (not valid) and are **not included** in the node's rolling average.
 
-## Node QoS Score
+#### Rolling Pool Mechanism
 
-Each node maintains a QoS score that represents its recent performance. This is a **rolling average** of the task scores from its most recent tasks.
+The long-term score (`Q_long`) is calculated using an in-memory rolling pool:
 
-### Rolling Pool Mechanism
-
-The node QoS score is calculated using an in-memory rolling pool:
-
-- **Pool size**: 50 tasks (`NODE_QOS_SCORE_POOL_SIZE = 50`)
+- **Pool size**: Configurable via `qos.score_pool_size` (default: 50 tasks)
 - The pool is stored per node address in a concurrent-safe map (`NodeQosScorePool`).
-- When a new task score arrives, it is appended to the pool. If the pool exceeds 50 entries, the oldest entry is removed.
-- The node's QoS score is the **arithmetic mean** of all scores in the pool.
+- When a new task score arrives, it is appended to the pool. If the pool exceeds the configured size, the oldest entry is removed.
+- `Q_long` is the **arithmetic mean** of all scores in the pool.
 
-### Pool Initialization
+When a node's pool does not yet exist in memory (e.g., after a relay restart), the pool is initialized from persisted `QOSScore` in the database (`models.Node.QOSScore`, which stores `Q_long`) to ensure smooth transition.
 
-When a node's pool does not yet exist in memory (e.g., after a relay restart), the pool is initialized as follows:
+### Short-term Reliability Factor (`H`)
 
-- If the node already has a non-zero `QOSScore` in the database, the pool is pre-filled with 49 copies of that existing score, then the new score is appended (total = 50).
-- If the node has no existing score, the pool starts empty and the new score is the first entry.
+The short-term factor (`H`) addresses the need to immediately penalize nodes that start timing out, protecting applications from unreliable nodes.
 
-This ensures that the rolling average transitions smoothly from the persisted score rather than jumping abruptly.
+Each node carries a **health multiplier** `H` (range 0.0 to 1.0, default 1.0).
 
-### When the Node QoS Score is Updated
+#### Penalty on Timeout
 
-The node QoS score is updated in the following task status transitions:
-
-1. **TaskGroupValidated** (`SetTaskStatusGroupValidated`): The "winning" task in the group. Node QoS is updated with the task's QoS score.
-2. **TaskEndGroupRefund** (`SetTaskStatusEndGroupRefund`): The other valid tasks in the group that are refunded. Node QoS is updated with the task's QoS score.
-3. **TaskEndAborted** (`SetTaskStatusEndAborted`): If the task has a valid QoS score (i.e., it was part of a group that was validated), the node QoS is updated.
-
-The `updateNodeQosScore` function calls `getNodeTaskQosScore` to compute the new rolling average and persists it to the database:
-
-```go
-// service/node.go
-func updateNodeQosScore(ctx context.Context, db *gorm.DB, node *models.Node, qos uint64) error {
-    qosScore, err := getNodeTaskQosScore(node, qos)
-    if err != nil {
-        return err
-    }
-    return node.Update(ctx, db, map[string]interface{}{
-        "qos_score": qosScore,
-    })
-}
-```
-
-## Node Selection Probability
-
-The QoS score directly influences a node's probability of being selected for new tasks. The selection probability combines two factors: **Staking Score** and **QoS Score**.
-
-### Staking Score
+When a task assigned to the node ends with a timeout, the health multiplier is penalized:
 
 ```
-StakingScore = sqrt(staking / maxStaking)
+H_new = H_effective * PenaltyFactor
 ```
 
-- `staking`: the node's staked amount.
-- `maxStaking`: the maximum staked amount among all nodes in the network (tracked globally and refreshed on node join/quit).
+Where `PenaltyFactor = 0.3`.
+- 1 timeout: H drops to 0.30 (70% reduction in QoS score)
+- 2 consecutive timeouts: H drops to 0.09 (effectively excluded)
 
-### QoS Score Normalization
+#### Hard Exclusion
 
-```
-QoSProb = nodeQoSScore / maxQoSScore
-```
+When a node's health drops below the **exclusion threshold** (`0.1`), its final QoS score is forced to **0**. The node is effectively excluded from receiving tasks until it recovers.
 
-- `nodeQoSScore`: the node's current rolling average QoS score.
-- `maxQoSScore`: a **fixed constant** equal to `TASK_SCORE_REWARDS[0]` = **10** (the maximum possible task score).
+#### Recovery
 
-**Important**: If the calculated `QoSProb` is 0 (e.g., for a new node with no score yet), it defaults to **0.5** as a baseline.
+The penalty is temporary. Health recovers via two mechanisms:
 
-### Combined Probability (Harmonic Mean)
-
-The final selection weight combines staking and QoS using the **harmonic mean formula**:
-
-```
-ProbWeight = StakingScore * QoSProb / (StakingScore + QoSProb)
-```
-
-If either component is 0, the combined probability is 0.
-
-### Model Locality Boost
-
-After computing base probabilities, nodes are further boosted based on whether they already have the required models locally. A task may require multiple models (stored as the `ModelIDs` list) -- for example, an SD task might need a base model plus one or more LoRA models. For LLM tasks, this is typically just a single model.
-
-#### Model Cache States
-
-A node's models can be in one of three states relative to a task's required models, each with different cost implications:
-
-- **In GPU memory (in-use)**: Zero switching cost, the node can begin inference immediately.
-- **On disk (downloaded but not loaded)**: No network download needed, but the model must be loaded from disk into GPU memory. Takes seconds to tens of seconds.
-- **Missing (not on disk)**: Must be downloaded from the network first, then loaded. Takes minutes for large models.
-
-The cost hierarchy is: **download >> disk load >> already loaded**. Having a model on disk (avoiding download) provides a larger benefit than having it in memory (avoiding disk load).
-
-#### Boost Formula
-
-The boost is calculated using a two-layer formula that weights disk presence and memory presence independently:
-
-```
-boost = 1 + diskWeight * (localCnt / total) + memWeight * (inUseCnt / total)
-```
-
-Where:
-
-- `localCnt`: number of the task's required models found on the node's local disk.
-- `inUseCnt`: number of the task's required models currently loaded in the node's GPU memory.
-- `total`: total number of models required by the task (`len(task.ModelIDs)`).
-- `diskWeight = 0.7`: weight for disk presence (avoiding network download).
-- `memWeight = 0.3`: weight for memory presence (avoiding disk-to-GPU load).
-
-Since in-use models are always a subset of local models (`inUseCnt <= localCnt`), in-memory naturally gets a strictly higher boost than on-disk-only. The weights are chosen so that:
-
-- Disk presence (0.7) contributes more than the additional memory bonus (0.3), reflecting that avoiding a network download is more valuable than avoiding a disk-to-GPU load.
-- The maximum boost is 2x (when all models are both on-disk and in-memory: 1 + 0.7 + 0.3).
-- All possible combinations of (localCnt, inUseCnt) produce distinct boost values with no ties, and the ordering matches the real-world cost hierarchy.
-
-#### Hard Filter
-
-- If **at least one node** has any matching local models (`localCnt > 0`), then **only** those nodes with local models are considered (nodes without local models are excluded from the selection pool). Within this pool, the boost formula determines relative priority.
-- If **no nodes** have any matching local models, the boost step is skipped entirely, and selection falls back to the **full candidate list** using only the base staking + QoS probabilities.
-
-#### Boost Examples
-
-**Single-model task** (total = 1):
-
-| Rank | In-memory | On-disk only | Missing | Boost |
-|------|-----------|--------------|---------|-------|
-| 1 | 1 | 0 | 0 | 2.0 |
-| 2 | 0 | 1 | 0 | 1.7 |
-| -- | 0 | 0 | 1 | Does not enter priority pool (localCnt=0), uses base probability only |
-
-**Dual-model task** (total = 2):
-
-| Rank | In-memory | On-disk only | Missing | Boost |
-|------|-----------|--------------|---------|-------|
-| 1 | 2 | 0 | 0 | 2.0 |
-| 2 | 1 | 1 | 0 | 1.85 |
-| 3 | 0 | 2 | 0 | 1.7 |
-| 4 | 1 | 0 | 1 | 1.5 |
-| 5 | 0 | 1 | 1 | 1.35 |
-| -- | 0 | 0 | 2 | Does not enter priority pool |
-
-**Triple-model task** (total = 3):
-
-| Rank | In-memory | On-disk only | Missing | Boost |
-|------|-----------|--------------|---------|-------|
-| 1 | 3 | 0 | 0 | 2.0 |
-| 2 | 2 | 1 | 0 | 1.9 |
-| 3 | 1 | 2 | 0 | 1.8 |
-| 4 | 0 | 3 | 0 | 1.7 |
-| 5 | 2 | 0 | 1 | 1.667 |
-| 6 | 1 | 1 | 1 | 1.567 |
-| 7 | 0 | 2 | 1 | 1.467 |
-| 8 | 1 | 0 | 2 | 1.333 |
-| 9 | 0 | 1 | 2 | 1.233 |
-
-Key properties across all task sizes:
-
-- Nodes with all models locally available always rank above nodes with any missing models, because avoiding downloads is the highest-value optimization.
-- Within the same local availability level, more in-memory models rank higher.
-- No ties exist between any two distinct (localCnt, inUseCnt) combinations.
-
-### Model Pre-download (Download Task)
-
-To ensure that in-demand models are available on enough nodes, the relay triggers a **model pre-download mechanism** every time a task starts. This proactively spreads models to additional nodes when fewer than 3 available nodes have a required model, so that future tasks are more likely to benefit from the model locality boost described above.
-
-For a detailed description of this mechanism, including the spreading logic, node selection process, and relevant code locations, see [Model Pre-download Mechanism](model_predownload.md).
-
-### Weighted Random Selection
-
-The actual node selection uses weighted random sampling (`gonum/stat/sampleuv.NewWeighted`), where each node's weight is its computed probability. This is a probabilistic selection, not deterministic - higher-weighted nodes are more likely to be selected, but any eligible node can be chosen.
-
-## Permanent Kickout
-
-The permanent kickout mechanism removes nodes whose QoS score demonstrates sustained poor performance. It uses the same 50-task rolling average QoS score described above.
-
-### Kickout Criteria
-
-The kickout check (`ShouldPermanentKickout` in `service/qos.go`) evaluates two conditions, both of which must be true:
-
-1. The node's QoS score is below the configured `qos.kickout_threshold` (default: 2.0).
-2. The QoS score pool has accumulated enough samples (equal to `qos.score_pool_size`, default: 50).
-
-The second condition prevents premature kickout of nodes that have only completed a few grouped tasks — the system waits until there is a statistically meaningful sample before making a permanent removal decision.
-
-### When the Kickout Check Runs
-
-The check happens inside `nodeFinishTask`, which is called every time a node completes processing a task — whether the outcome is success, group refund, or abort.
-
-### Kickout Execution
-
-If the kickout condition is met:
-
-1. The node's status is set to quit.
-2. All of the node's local model records are deleted.
-3. An unstake transaction is queued on the blockchain (the node is **not slashed** — its stake is returned).
-4. A `NodeKickedOutEvent` is emitted.
-
-### Interaction with Application-Caused Failures
-
-When an invalid application task causes ALL nodes in a validation group to timeout, the QoS scores for that group are set to NULL and **excluded from the rolling average**. This means application-caused failures do not drag down a node's QoS score. Only genuine node-specific failures — where the node times out but other nodes in the same group succeed (receiving a QoS score of 0) — affect the score.
-
-Since QoS scores only cover grouped (validation) tasks (~1% of all tasks), the permanent kickout is a long-term backstop that catches nodes whose failures are consistently their own fault. For short-term timeout penalty and temporary exclusion, see the [health multiplier](node_health.md).
-
-## Reward Distribution for Grouped Tasks
-
-When a grouped task succeeds (the result is uploaded), rewards are distributed proportionally to the task QoS scores rather than equally.
-
-### Calculation
-
-For each valid task in the group (status `TaskGroupValidated` or `TaskEndGroupRefund`):
-
-```
-payment = taskFee * taskQoSScore / totalScore
-```
-
-Where:
-- `taskFee`: the fee associated with each individual task in the group.
-- `taskQoSScore`: the task's QoS score (10, 5, or 2).
-- `totalScore`: the sum of all valid tasks' QoS scores in the group.
-
-Any remainder from integer division is accumulated and added to the **last valid task's** payment to ensure no tokens are lost.
-
-### Example
-
-For a group of 3 tasks with fee = 100 each, all completed successfully:
-
-| Node | Score | Share | Payment |
-|------|-------|-------|---------|
-| 1st  | 10    | 10/17 | 58      |
-| 2nd  | 5     | 5/17  | 29      |
-| 3rd  | 2     | 2/17  | 13 (includes remainder) |
-
-## Task Validation Logic
-
-The validation process in `ValidateTaskGroup` determines the outcome for each task in a group:
-
-### Score Comparison
-
-- For **SD/SD-FT-LoRA tasks**: Scores (perceptual hashes) are compared using Hamming distance. Each 8-byte segment must have a Hamming distance below a configurable threshold.
-- For **LLM tasks**: Scores must be exactly equal.
-
-### Validation Outcomes
-
-Given 3 tasks in a group, the system checks pairwise similarity:
-
-| Scenario | Task 1 | Task 2 | Task 3 |
-|----------|--------|--------|--------|
-| All 3 match | GroupValidated | GroupRefund | GroupRefund |
-| 1 & 2 match, 3 differs | GroupValidated | GroupRefund | Invalidated (slashed) |
-| 1 & 3 match, 2 differs | GroupValidated | Invalidated (slashed) | GroupRefund |
-| 2 & 3 match, 1 differs | Invalidated (slashed) | GroupValidated | GroupRefund |
-| None match | All Aborted | All Aborted | All Aborted |
-
-The **first matching task** (by execution time order) becomes `GroupValidated` (the "winner" whose result is used). The other matching task(s) become `GroupRefund` (they get refunded but still receive QoS scores). Invalidated tasks result in the node being **slashed** (staked tokens confiscated).
-
-Note: The `GroupValidated` task is the one that eventually has its result uploaded by the task creator (triggering `SetTaskStatusEndSuccess` -> `SetTaskStatusEndGroupSuccess`). At that point, rewards are distributed to all valid tasks in the group proportionally to their QoS scores.
-
-## Data Flow Summary
-
-```
-Task Created
-    |
-    v
-Task Started (assigned to node)
-    |
-    v
-Node submits result -> TaskScoreReady (records ScoreReadyTime)
-    |
-    v
-Task Creator validates group (VRF proof + score comparison)
-    |
-    v
-+-- GroupValidated (winner) -----> updateNodeQosScore(node, taskScore)
-|
-+-- GroupRefund (matching) -------> updateNodeQosScore(node, taskScore)
-|
-+-- Invalidated (cheater) -------> nodeSlash (no QoS update, kicked & slashed)
-|
-+-- Aborted (all failed) --------> QoS score set to NULL (ignored)
-    |
-    v
-Task Creator uploads result -> EndGroupSuccess
-    |
-    v
-Rewards distributed proportionally to task QoS scores
-```
+1. **Passive time-based recovery**: Exponential decay toward 1.0 with a 30-minute time constant.
+   ```
+   H(t) = H_base + (1 - H_base) * (1 - exp(-elapsed / 30min))
+   ```
+2. **Active success-based recovery**: Every successfully completed task adds a boost of `0.15` to H.
 
 ## Key Constants and Config
 
 | Constant / Config | Value | Description |
 |-------------------|-------|-------------|
 | `TASK_SCORE_REWARDS` | [10, 5, 2] | Task scores for 1st, 2nd, 3rd place |
-| `qos.score_pool_size` | 50 (default) | Rolling pool size for node QoS calculation |
-| `qos.kickout_threshold` | 2.0 (default) | QoS score below which a node is permanently kicked out |
 | `maxQoSScore` | 10.0 | Fixed normalization denominator for QoS score |
-| Default QoS Prob | 0.5 | Fallback when QoS probability is 0 |
+| `qos.score_pool_size` | 50 | Rolling pool size for node QoS calculation |
+| `qos.penalty_factor` | 0.3 | Multiplier applied to H on timeout |
+| `qos.success_boost` | 0.15 | Additive boost to H on success |
+| `qos.recovery_tau_minutes` | 30 | Time constant used for passive health recovery |
+| `qos.exclude_threshold` | 0.1 | H value below which QoS becomes 0 (excluded) |
 
 ## Relevant Source Files
 
 | File | Description |
 |------|-------------|
-| `service/qos.go` | Core QoS logic: task score assignment, rolling pool, permanent kickout check |
-| `service/health.go` | Health multiplier: penalty, boost, effective health calculation |
-| `service/selecting_prob.go` | Selection probability calculation (staking + QoS) |
-| `service/validate_task.go` | Task group validation and QoS score assignment |
-| `service/task_status.go` | Task state transitions, QoS updates, health penalty/boost |
-| `service/select_nodes.go` | Node selection using QoS-weighted probability * health multiplier |
-| `service/node.go` | Node management, QoS persistence, kickout execution |
-| `models/inference_task.go` | Task model with QOSScore field and ExecutionTime method |
-| `models/node.go` | Node model with QOSScore, HealthBase, HealthUpdatedAt fields |
-| `models/network.go` | NetworkNodeData with QoS field (synced periodically) |
-| `tasks/sync_network.go` | Background task syncing node QoS to network statistics |
-| `utils/vrf.go` | VRF validation check for task grouping |
+| `service/qos.go` | Core QoS logic: long-term pool, short-term health (H), combined score calculation (`CalculateQosScore`) |
+| `service/task_status.go` | Task state transitions, QoS updates, health penalty/boost triggers |
+| `models/node.go` | Node model with `QOSScore` (long-term), `HealthBase`, `HealthUpdatedAt` |

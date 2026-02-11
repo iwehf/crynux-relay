@@ -54,7 +54,8 @@ func GetNode(c *gin.Context, input *GetNodeInput) (*NodeResponse, error) {
 
 	nodeVersion := fmt.Sprintf("%d.%d.%d", node.MajorVersion, node.MinorVersion, node.PatchVersion)
 
-	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(&node.StakeAmount.Int, service.GetMaxStaking(), node.QOSScore, service.GetMaxQosScore())
+	qos := service.CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
+	stakingScore, qosScore, probWeight := service.CalculateSelectingProb(&node.StakeAmount.Int, service.GetMaxStaking(), qos)
 
 	return &NodeResponse{
 		Data: &Node{

@@ -30,13 +30,12 @@ task:
 task_schema:
   stable_diffusion_inference: 'https://raw.githubusercontent.com/crynux-ai/stable-diffusion-task/main/schema/stable-diffusion-inference-task.json'
   gpt_inference: "https://raw.githubusercontent.com/crynux-ai/gpt-task/main/schema/gpt-inference-task.json"
-node_health:
+qos:
+  score_pool_size: 50
+  kickout_threshold: 2.0
   penalty_factor: 0.3
   success_boost: 0.15
   recovery_tau_minutes: 30
   exclude_threshold: 0.1
-qos:
-  score_pool_size: 50
-  kickout_threshold: 2.0
 test:
   root_account: ""

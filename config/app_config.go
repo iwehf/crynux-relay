@@ -110,15 +110,12 @@ type AppConfig struct {
 		SecretKeyFile string `mapstructure:"secret_key_file"`
 	} `mapstructure:"mac"`
 
-	NodeHealth struct {
+	QoS struct {
+		ScorePoolSize      uint64  `mapstructure:"score_pool_size"`
+		KickoutThreshold   float64 `mapstructure:"kickout_threshold"`
 		PenaltyFactor      float64 `mapstructure:"penalty_factor"`
 		SuccessBoost       float64 `mapstructure:"success_boost"`
 		RecoveryTauMinutes float64 `mapstructure:"recovery_tau_minutes"`
 		ExcludeThreshold   float64 `mapstructure:"exclude_threshold"`
-	} `mapstructure:"node_health"`
-
-	QoS struct {
-		ScorePoolSize    uint64  `mapstructure:"score_pool_size"`
-		KickoutThreshold float64 `mapstructure:"kickout_threshold"`
 	} `mapstructure:"qos"`
 }
