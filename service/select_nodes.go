@@ -182,16 +182,18 @@ func selectNodeForInferenceTask(ctx context.Context, task *models.InferenceTask)
 			}
 		}
 
-		// add additional qos score to nodes with local task models
+		// Boost nodes that have task models locally. Two cache layers are weighted
+		// independently: disk presence (0.7) avoids expensive network downloads,
+		// memory presence (0.3) avoids disk-to-GPU loading. Since in-use models
+		// are a subset of local models, in-memory always gets a strictly higher
+		// boost than on-disk-only.
 		cnt := matchModels(localModelIDs, task.ModelIDs)
 		if cnt > 0 {
 			changedNodes = append(changedNodes, node)
 			changedScore := scores[i]
-			if isSameModels(inUseModelIDs, task.ModelIDs) {
-				changedScore *= 2
-			} else {
-				changedScore *= (1 + float64(cnt) / float64(len(task.ModelIDs)))
-			}
+			inUseCnt := matchModels(inUseModelIDs, task.ModelIDs)
+			total := float64(len(task.ModelIDs))
+			changedScore *= (1 + 0.7*float64(cnt)/total + 0.3*float64(inUseCnt)/total)
 			changedScores = append(changedScores, changedScore)
 		}
 

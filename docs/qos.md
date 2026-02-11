@@ -152,12 +152,83 @@ If either component is 0, the combined probability is 0.
 
 After computing base probabilities, nodes are further boosted based on whether they already have the required models locally. A task may require multiple models (stored as the `ModelIDs` list) -- for example, an SD task might need a base model plus one or more LoRA models. For LLM tasks, this is typically just a single model.
 
-The boost logic works as follows:
+#### Model Cache States
 
-- If the node's currently **in-use models match exactly** with the task's required models: **2x boost**.
-- If the node has **some (but not all)** of the required models locally: boost by `1 + matchCount / totalRequired` (between 1x and 2x).
-- If **at least one node** has matching local models, then **only** those nodes with local models are considered (nodes without local models are excluded from the selection pool).
+A node's models can be in one of three states relative to a task's required models, each with different cost implications:
+
+- **In GPU memory (in-use)**: Zero switching cost, the node can begin inference immediately.
+- **On disk (downloaded but not loaded)**: No network download needed, but the model must be loaded from disk into GPU memory. Takes seconds to tens of seconds.
+- **Missing (not on disk)**: Must be downloaded from the network first, then loaded. Takes minutes for large models.
+
+The cost hierarchy is: **download >> disk load >> already loaded**. Having a model on disk (avoiding download) provides a larger benefit than having it in memory (avoiding disk load).
+
+#### Boost Formula
+
+The boost is calculated using a two-layer formula that weights disk presence and memory presence independently:
+
+```
+boost = 1 + diskWeight * (localCnt / total) + memWeight * (inUseCnt / total)
+```
+
+Where:
+
+- `localCnt`: number of the task's required models found on the node's local disk.
+- `inUseCnt`: number of the task's required models currently loaded in the node's GPU memory.
+- `total`: total number of models required by the task (`len(task.ModelIDs)`).
+- `diskWeight = 0.7`: weight for disk presence (avoiding network download).
+- `memWeight = 0.3`: weight for memory presence (avoiding disk-to-GPU load).
+
+Since in-use models are always a subset of local models (`inUseCnt <= localCnt`), in-memory naturally gets a strictly higher boost than on-disk-only. The weights are chosen so that:
+
+- Disk presence (0.7) contributes more than the additional memory bonus (0.3), reflecting that avoiding a network download is more valuable than avoiding a disk-to-GPU load.
+- The maximum boost is 2x (when all models are both on-disk and in-memory: 1 + 0.7 + 0.3).
+- All possible combinations of (localCnt, inUseCnt) produce distinct boost values with no ties, and the ordering matches the real-world cost hierarchy.
+
+#### Hard Filter
+
+- If **at least one node** has any matching local models (`localCnt > 0`), then **only** those nodes with local models are considered (nodes without local models are excluded from the selection pool). Within this pool, the boost formula determines relative priority.
 - If **no nodes** have any matching local models, the boost step is skipped entirely, and selection falls back to the **full candidate list** using only the base staking + QoS probabilities.
+
+#### Boost Examples
+
+**Single-model task** (total = 1):
+
+| Rank | In-memory | On-disk only | Missing | Boost |
+|------|-----------|--------------|---------|-------|
+| 1 | 1 | 0 | 0 | 2.0 |
+| 2 | 0 | 1 | 0 | 1.7 |
+| -- | 0 | 0 | 1 | Does not enter priority pool (localCnt=0), uses base probability only |
+
+**Dual-model task** (total = 2):
+
+| Rank | In-memory | On-disk only | Missing | Boost |
+|------|-----------|--------------|---------|-------|
+| 1 | 2 | 0 | 0 | 2.0 |
+| 2 | 1 | 1 | 0 | 1.85 |
+| 3 | 0 | 2 | 0 | 1.7 |
+| 4 | 1 | 0 | 1 | 1.5 |
+| 5 | 0 | 1 | 1 | 1.35 |
+| -- | 0 | 0 | 2 | Does not enter priority pool |
+
+**Triple-model task** (total = 3):
+
+| Rank | In-memory | On-disk only | Missing | Boost |
+|------|-----------|--------------|---------|-------|
+| 1 | 3 | 0 | 0 | 2.0 |
+| 2 | 2 | 1 | 0 | 1.9 |
+| 3 | 1 | 2 | 0 | 1.8 |
+| 4 | 0 | 3 | 0 | 1.7 |
+| 5 | 2 | 0 | 1 | 1.667 |
+| 6 | 1 | 1 | 1 | 1.567 |
+| 7 | 0 | 2 | 1 | 1.467 |
+| 8 | 1 | 0 | 2 | 1.333 |
+| 9 | 0 | 1 | 2 | 1.233 |
+
+Key properties across all task sizes:
+
+- Nodes with all models locally available always rank above nodes with any missing models, because avoiding downloads is the highest-value optimization.
+- Within the same local availability level, more in-memory models rank higher.
+- No ties exist between any two distinct (localCnt, inUseCnt) combinations.
 
 ### Model Pre-download (Download Task)
 
