@@ -27,6 +27,8 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 	err = db.Transaction(func(tx *gorm.DB) error {
 		node.Status = models.NodeStatusAvailable
 		node.JoinTime = time.Now()
+		node.HealthBase = 1.0
+		node.HealthUpdatedAt = sql.NullTime{Time: time.Now(), Valid: true}
 		if err := node.Save(ctx, tx); err != nil {
 			return err
 		}
@@ -39,15 +41,17 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 			return err
 		}
 		networkNodeData := models.NetworkNodeData{
-			Address:   node.Address,
-			CardModel: node.GPUName,
-			VRam:      int(node.GPUVram),
-			QoS:       node.QOSScore,
-			Staking:   node.StakeAmount,
+			Address:         node.Address,
+			CardModel:       node.GPUName,
+			VRam:            int(node.GPUVram),
+			QoS:             node.QOSScore,
+			Staking:         node.StakeAmount,
+			HealthBase:      node.HealthBase,
+			HealthUpdatedAt: node.HealthUpdatedAt,
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "address"}},
-			DoUpdates: clause.AssignmentColumns([]string{"card_model", "v_ram", "qo_s", "staking", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"card_model", "v_ram", "qo_s", "staking", "health_base", "health_updated_at", "updated_at"}),
 		}).Create(&networkNodeData).Error; err != nil {
 			return err
 		}
@@ -170,11 +174,9 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		return errors.New("task id commitment is not valid")
 	}
 	taskIDCommitment := node.CurrentTaskIDCommitment.String
-	kickout, err := shouldKickoutNode(ctx, node)
-	if err != nil {
-		return err
-	}
-	if kickout {
+
+	// QoS-based permanent kickout check
+	if ShouldPermanentKickout(node) {
 		return db.Transaction(func(tx *gorm.DB) error {
 			if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
 				return err

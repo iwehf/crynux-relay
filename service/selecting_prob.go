@@ -21,19 +21,16 @@ func InitSelectingProb(ctx context.Context, db *gorm.DB) error {
 	return RefreshMaxStaking(ctx, db)
 }
 
-func CalculateSelectingProb(staking, maxStaking *big.Int, qosScore, maxQosScore float64) (float64, float64, float64) {
+func CalculateSelectingProb(staking, maxStaking *big.Int, qosScore float64) (float64, float64, float64) {
 	stakingProb := CalculateStakingScore(staking, maxStaking)
-	qosProb := CalculateQosScore(qosScore, maxQosScore)
-	if qosProb == 0 {
-		qosProb = 0.5
-	}
+
 	var prob float64
-	if stakingProb == 0 || qosProb == 0 {
+	if stakingProb == 0 || qosScore == 0 {
 		prob = 0
 	} else {
-		prob = stakingProb * qosProb / (stakingProb + qosProb)
+		prob = stakingProb * qosScore / (stakingProb + qosScore)
 	}
-	return stakingProb, qosProb, prob
+	return stakingProb, qosScore, prob
 }
 
 func CalculateStakingScore(staking, maxStaking *big.Int) float64 {
@@ -44,13 +41,6 @@ func CalculateStakingScore(staking, maxStaking *big.Int) float64 {
 	p = big.NewFloat(0).Sqrt(p)
 	stakingProb, _ := p.Float64()
 	return stakingProb
-}
-
-func CalculateQosScore(qosScore, maxQosScore float64) float64 {
-	if maxQosScore == 0 {
-		return 0
-	}
-	return qosScore / maxQosScore
 }
 
 func GetMaxStaking() *big.Int {
@@ -68,7 +58,7 @@ func UpdateMaxStaking(staking *big.Int) {
 func RefreshMaxStaking(ctx context.Context, db *gorm.DB) error {
 	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
+
 	type result struct {
 		StakeAmount models.BigInt `json:"stake_amount"`
 	}
@@ -87,7 +77,6 @@ func RefreshMaxStaking(ctx context.Context, db *gorm.DB) error {
 
 	return nil
 }
-
 
 type MaxStaking struct {
 	sync.RWMutex

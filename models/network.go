@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"gorm.io/gorm"
@@ -42,10 +43,12 @@ func AddTotalTask(ctx context.Context, db *gorm.DB) error {
 
 type NetworkNodeData struct {
 	gorm.Model
-	Address   string  `json:"address" gorm:"index"`
-	CardModel string  `json:"card_model"`
-	VRam      int     `json:"v_ram"`
-	Balance   BigInt  `json:"balance" gorm:"type:string;size:255"`
-	QoS       float64 `json:"qos"`
-	Staking   BigInt  `json:"staking" gorm:"type:string;size:255"`
+	Address         string       `json:"address" gorm:"index"`
+	CardModel       string       `json:"card_model"`
+	VRam            int          `json:"v_ram"`
+	Balance         BigInt       `json:"balance" gorm:"type:string;size:255"`
+	QoS             float64      `json:"qos"`
+	Staking         BigInt       `json:"staking" gorm:"type:string;size:255"`
+	HealthBase      float64      `json:"health_base"`
+	HealthUpdatedAt sql.NullTime `json:"health_updated_at"`
 }

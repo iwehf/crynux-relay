@@ -1,0 +1,133 @@
+# Quality of Service (QoS) Implementation
+
+This document describes the QoS implementation in the Crynux Relay codebase.
+
+## Overview
+
+The QoS (Quality of Service) system is designed to improve network service quality by rewarding nodes that deliver faster execution and reliable availability, while reducing the impact of nodes that frequently fail or time out.
+
+The QoS score is updated continuously as a node executes tasks and is used as an input to network decisions such as task allocation preference and reliability protection mechanisms.
+
+At its core, QoS is intentionally split across two time scales: a long-term performance component derived from task completion speed (`Q_long`), and a short-term reliability component (`H`) that reacts quickly to timeouts but can recover after sustained success.
+
+## Naming Clarification (Code vs Concepts)
+
+In the codebase, "QoS" may refer to either the persisted long-term performance score or the final runtime QoS used for selection. The mapping below is the source of truth:
+
+| Code Symbol | Actual Meaning |
+|-------------|----------------|
+| `models.Node.QOSScore` | `Q_long`, the persisted long-term performance score (not the final runtime QoS) |
+| `CalculateQosScore(qosScore, healthBase, healthUpdatedAt)` parameter `qosScore` | `Q_long` loaded from `models.Node.QOSScore` |
+| `CalculateQosScore(...)` return value | final runtime QoS used for selection (after hard exclusion) |
+
+In short: the database field named `QOSScore` stores long-term performance only, while the final runtime QoS is computed by combining normalized `Q_long` with effective health `H`.
+
+## QoS Score Definition
+
+The final runtime QoS score evaluates node quality through two factors that operate at different time scales:
+
+- **Long-term performance factor**: A rolling average of recent validation task scores that captures whether a node is consistently fast.
+- **Short-term reliability factor**: A multiplier that reacts immediately to timeout failures, capturing whether a node is currently dependable.
+
+The final QoS score for a node is the product of both factors:
+
+```
+QoS = (Q_long / Q_max) * H
+```
+
+Where:
+- `Q_long`: the node's long-term performance score (rolling average of task scores).
+- `Q_max`: the maximum possible task score (10.0).
+- `H`: the short-term reliability factor (range 0 to 1).
+
+If `Q_long` is 0 (e.g., for a new node), it defaults to `5.0` (half of `Q_max`) before applying `H`.
+
+## Factor Calculation
+
+This section explains how `Q_long` and `H` are computed.
+### Long-term Performance Score (`Q_long`)
+
+`Q_long` measures a node's sustained execution speed across its recent validation tasks. It changes gradually and reflects the node's typical hardware and network quality.
+
+#### Task Grouping (Validation Tasks)
+
+Not all tasks contribute to `Q_long`. Only **grouped tasks** (validation tasks) receive Task Scores that enter the rolling pool. A grouped task is executed by **3 different nodes** simultaneously. Single (non-grouped) tasks do not generate Task Scores for `Q_long` (though they do influence the short-term reliability factor via successful completion or timeout).
+
+#### Task Score
+
+When a grouped task is validated, each of the 3 tasks in the group receives a **Task Score** based on execution speed (SubmissionTime - StartTime).
+
+Tasks within a group are sorted by execution time (fastest first). The fixed score values are:
+
+| Completion Order | Task Score |
+|-----------------|------------|
+| 1st (fastest)   | 10         |
+| 2nd             | 5          |
+| 3rd (slowest)   | 2          |
+
+Special cases:
+- Tasks that were **aborted** before the group validation receive a score of **0**.
+- If **all 3 tasks** in a group are aborted, QoS scores are set to NULL (not valid) and are **not included** in the node's rolling average.
+
+#### Rolling Pool Mechanism
+
+The long-term score (`Q_long`) is calculated using an in-memory rolling pool:
+
+- **Pool size**: Configurable via `qos.score_pool_size` (default: 50 tasks)
+- The pool is stored per node address in a concurrent-safe map (`NodeQosScorePool`).
+- When a new task score arrives, it is appended to the pool. If the pool exceeds the configured size, the oldest entry is removed.
+- `Q_long` is the **arithmetic mean** of all scores in the pool.
+
+When a node's pool does not yet exist in memory (e.g., after a relay restart), the pool is initialized from persisted `QOSScore` in the database (`models.Node.QOSScore`, which stores `Q_long`) to ensure smooth transition.
+
+### Short-term Reliability Factor (`H`)
+
+The short-term factor (`H`) addresses the need to immediately penalize nodes that start timing out, protecting applications from unreliable nodes.
+
+Each node carries a **health multiplier** `H` (range 0.0 to 1.0, default 1.0).
+
+#### Penalty on Timeout
+
+When a task assigned to the node ends with a timeout, the health multiplier is penalized:
+
+```
+H_new = H_effective * PenaltyFactor
+```
+
+Where `PenaltyFactor = 0.3`.
+- 1 timeout: H drops to 0.30 (70% reduction in QoS score)
+- 2 consecutive timeouts: H drops to 0.09 (effectively excluded)
+
+#### Hard Exclusion
+
+When a node's health drops below the **exclusion threshold** (`0.1`), its final QoS score is forced to **0**. The node is effectively excluded from receiving tasks until it recovers.
+
+#### Recovery
+
+The penalty is temporary. Health recovers via two mechanisms:
+
+1. **Passive time-based recovery**: Exponential decay toward 1.0 with a 30-minute time constant.
+   ```
+   H(t) = H_base + (1 - H_base) * (1 - exp(-elapsed / 30min))
+   ```
+2. **Active success-based recovery**: Every successfully completed task adds a boost of `0.15` to H.
+
+## Key Constants and Config
+
+| Constant / Config | Value | Description |
+|-------------------|-------|-------------|
+| `TASK_SCORE_REWARDS` | [10, 5, 2] | Task scores for 1st, 2nd, 3rd place |
+| `maxQoSScore` | 10.0 | Fixed normalization denominator for QoS score |
+| `qos.score_pool_size` | 50 | Rolling pool size for node QoS calculation |
+| `qos.penalty_factor` | 0.3 | Multiplier applied to H on timeout |
+| `qos.success_boost` | 0.15 | Additive boost to H on success |
+| `qos.recovery_tau_minutes` | 30 | Time constant used for passive health recovery |
+| `qos.exclude_threshold` | 0.1 | H value below which QoS becomes 0 (excluded) |
+
+## Relevant Source Files
+
+| File | Description |
+|------|-------------|
+| `service/qos.go` | Core QoS logic: long-term pool, short-term health (H), combined score calculation (`CalculateQosScore`) |
+| `service/task_status.go` | Task state transitions, QoS updates, health penalty/boost triggers |
+| `models/node.go` | Node model with `QOSScore` (long-term), `HealthBase`, `HealthUpdatedAt` |

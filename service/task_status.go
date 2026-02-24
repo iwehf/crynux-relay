@@ -252,6 +252,10 @@ func SetTaskStatusGroupValidated(ctx context.Context, db *gorm.DB, originTask *m
 			}
 		}
 
+		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
+			return err
+		}
+
 		return emitEvent(ctx, tx, &models.TaskValidatedEvent{TaskIDCommitment: task.TaskIDCommitment, SelectedNode: task.SelectedNode})
 	}); err != nil {
 		return err
@@ -319,6 +323,9 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		if err != nil {
 			return err
 		}
+		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
+			return err
+		}
 		if err := nodeFinishTask(ctx, tx, node); err != nil {
 			return err
 		}
@@ -372,6 +379,12 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 			} else {
 				if task.QOSScore.Valid {
 					if err := updateNodeQosScore(ctx, tx, node, uint64(task.QOSScore.Int64)); err != nil {
+						return err
+					}
+				}
+				// Apply health penalty on timeout when the node never submitted a result
+				if task.AbortReason == models.TaskAbortTimeout && !task.ScoreReadyTime.Valid {
+					if err := ApplyHealthPenalty(ctx, tx, node); err != nil {
 						return err
 					}
 				}
@@ -469,6 +482,10 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			"result_uploaded_time": sql.NullTime{Time: time.Now(), Valid: true},
 		})
 		if err != nil {
+			return err
+		}
+
+		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
 			return err
 		}
 
