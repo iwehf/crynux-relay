@@ -111,13 +111,9 @@ func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) err
 	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
 	hNew := hEffective * cfg.PenaltyFactor
 
-	now := time.Now()
-	node.HealthBase = hNew
-	node.HealthUpdatedAt = sql.NullTime{Time: now, Valid: true}
-
 	return node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
-		"health_updated_at": sql.NullTime{Time: now, Valid: true},
+		"health_updated_at": sql.NullTime{Time: time.Now(), Valid: true},
 	})
 }
 
@@ -131,13 +127,9 @@ func ApplyHealthBoost(ctx context.Context, db *gorm.DB, node *models.Node) error
 		hNew = 1.0
 	}
 
-	now := time.Now()
-	node.HealthBase = hNew
-	node.HealthUpdatedAt = sql.NullTime{Time: now, Valid: true}
-
 	return node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
-		"health_updated_at": sql.NullTime{Time: now, Valid: true},
+		"health_updated_at": sql.NullTime{Time: time.Now(), Valid: true},
 	})
 }
 
