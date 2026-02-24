@@ -1,5 +1,5 @@
-# h-relay
-The layer 2 relay server for the Crynux node
+# Crynux Relay
+The relay server for the Crynux node
 
 
 ### Running the tests
