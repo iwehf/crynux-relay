@@ -2,6 +2,8 @@
 
 This document describes how node selection works in Crynux Relay.
 
+For task and node version compatibility rules used by this selection flow, see [task_version.md](./task_version.md).
+
 ## Overview
 
 Node selection is a pipeline:
