@@ -3,33 +3,89 @@ environment: "debug"
 db:
   driver: "mysql"
   connection: "user:mypass@(127.0.0.1:3306)/mydb?parseTime=true"
+  log:
+    level: "info"
+    output: "data/logs/db.log"
+    max_file_size: 100
+    max_days: 30
+    max_file_num: 5
 log:
   level: "debug"
-  output: "data/logs/log"
+  output: "data/logs/relay.log"
   max_file_size: 100
   max_days: 30
   max_file_num: 5
 http:
   host: "0.0.0.0"
   port: "8080"
+  jwt:
+    secret_key_file: "config/secrets/jwt_secret_key.txt"
+    expires_in: 3600
 data_dir:
   inference_tasks: "data/inference_tasks"
-blockchain:
-  rpc_endpoint: "https://block-node.crynux.ai/rpc"
-  start_block_num: 1904715
-  gas_limit: 4294967
-  account:
-    address: ""
-  contracts:
-    netstats: "0xC2c060f8C46640394E0937D75Ea977207E6df130"
-    task: "0x07E149A0e372C2F54Df6358d021d700703D222D1"
-    node: "0x662d296cae3f1Be2ed5803227dAd6435f1ffC438"
-    qos: "0x95E7e7Ed5463Ff482f61585605a0ff278e0E1FFb"
+  slashed_tasks: "data/slashed_tasks"
+blockchains:
+  dymension:
+    rps: 20
+    rpc_endpoint: "https://json-rpc.testnet-dym.crynux.io"
+    start_block_num: 0
+    gas_limit: 4294967
+    gas_price: 0
+    chain_id: 1313161573
+    account:
+      address: ""
+      private_key_file: "config/secrets/dym_private_key.txt"
+    contracts:
+      benefit_address: "0xa4AC846337794C93d68D387Be77663e32AD415bb"
+      node_staking: "0xf76C3f19c8976d0Bc49d48718669b99747b1837e"
+      credits: "0xb592ee9c75873E13501e2eF1e2c31604C056f197"
+    max_retries: 3
+    retry_interval: 3
+    send_wait_time: 30
+    receipt_wait_time: 30
+    sent_transaction_count_limit: 200
+  near:
+    rps: 20
+    rpc_endpoint: "https://json-rpc.testnet-near.crynux.io"
+    start_block_num: 0
+    gas_limit: 4294967
+    gas_price: 0
+    chain_id: 1313161574
+    account:
+      address: ""
+      private_key_file: "config/secrets/near_private_key.txt"
+    contracts:
+      benefit_address: "0xf57a8f8F7ab52EBD7971A65e9B44C767d3119c4f"
+      node_staking: "0xd20403b243b0109809BEAa93Ac38f0e3b30039C0"
+      credits: "0xdC54E16BB691C093264A58CcE1d5E357878b3D93"
+    max_retries: 3
+    retry_interval: 3
+    send_wait_time: 30
+    receipt_wait_time: 30
+    sent_transaction_count_limit: 200
 task:
-  timeout: 30
+  stake_amount: 0
+  distance_threshold: 0
 task_schema:
-  stable_diffusion_inference: 'https://raw.githubusercontent.com/crynux-ai/stable-diffusion-task/main/schema/stable-diffusion-inference-task.json'
-  gpt_inference: "https://raw.githubusercontent.com/crynux-ai/gpt-task/main/schema/gpt-inference-task.json"
+  stable_diffusion_inference: "https://raw.githubusercontent.com/crynux-network/stable-diffusion-task/main/schema/stable-diffusion-inference-task.json"
+  gpt_inference: "https://raw.githubusercontent.com/crynux-network/gpt-task/main/schema/gpt-inference-task.json"
+  stable_diffusion_finetune_lora: "https://raw.githubusercontent.com/crynux-network/stable-diffusion-task/main/schema/stable-diffusion-finetune-lora-task.json"
+withdraw:
+  address: ""
+  min_withdrawal_amount: 10000
+  withdrawal_fee: 100
+  withdrawal_fee_address: ""
+credits:
+  address: ""
+dao:
+  address: ""
+  percent: 0
+buy_quota:
+  address: ""
+buy_task_fee:
+  address: ""
+mac:
+  secret_key_file: "config/secrets/mac_secret_key.txt"
 qos:
   score_pool_size: 50
   kickout_threshold: 2.0
@@ -37,5 +93,3 @@ qos:
   success_boost: 0.15
   recovery_tau_minutes: 30
   exclude_threshold: 0.1
-test:
-  root_account: ""

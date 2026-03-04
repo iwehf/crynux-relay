@@ -56,7 +56,6 @@ type AppConfig struct {
 			Address            string `mapstructure:"address"`
 			PrivateKey         string `mapstructure:"private_key"`
 			PrivateKeyFile     string `mapstructure:"private_key_file"`
-			GenesisTokenAmount uint64 `mapstructure:"genesis_token_amount" description:"genesis token amount, in ether unit"`
 		} `mapstructure:"account"`
 		Contracts struct {
 			BenefitAddress string `mapstructure:"benefit_address"`
