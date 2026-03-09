@@ -2,8 +2,6 @@
 
 This document describes how node selection works in Crynux Relay.
 
-For task and node version compatibility rules used by this selection flow, see [task_version.md](./task_version.md).
-
 ## Overview
 
 Node selection is a pipeline:
@@ -17,10 +15,10 @@ Node selection is a pipeline:
 
 The relay first applies hard filters to form the candidate set.
 
-- **Availability**
-- **Hardware compatibility**
-- **Version compatibility**
-- **Task-specific exclusions**
+- **Availability**. Only nodes currently in the `Available` status are eligible for selection.
+- **Hardware compatibility**. If the task specifies a required GPU, the node must match both that GPU model and the required VRAM exactly. Otherwise, the node must satisfy the task's minimum VRAM requirement.
+- **Version compatibility**. For task and node version compatibility rules used by this selection flow, see [task_version.md](./task_version.md).
+- **Task-specific exclusions**. `LLM` tasks exclude nodes on `Darwin`.
 - **Local model filter (on-disk)**. Only select nodes that have at least one required model available locally on disk. If no node has any required model available locally, keep all candidates.
 
 ## Base Weight
