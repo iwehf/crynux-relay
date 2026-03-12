@@ -42,7 +42,7 @@ type AppConfig struct {
 
 	DataDir struct {
 		InferenceTasks string `mapstructure:"inference_tasks"`
-		SlashedTasks string `mapstructure:"slashed_tasks"`
+		SlashedTasks   string `mapstructure:"slashed_tasks"`
 	} `mapstructure:"data_dir"`
 
 	Blockchains map[string]struct {
@@ -53,9 +53,9 @@ type AppConfig struct {
 		GasPrice      uint64 `mapstructure:"gas_price"`
 		ChainID       uint64 `mapstructure:"chain_id"`
 		Account       struct {
-			Address            string `mapstructure:"address"`
-			PrivateKey         string `mapstructure:"private_key"`
-			PrivateKeyFile     string `mapstructure:"private_key_file"`
+			Address        string `mapstructure:"address"`
+			PrivateKey     string `mapstructure:"private_key"`
+			PrivateKeyFile string `mapstructure:"private_key_file"`
 		} `mapstructure:"account"`
 		Contracts struct {
 			BenefitAddress string `mapstructure:"benefit_address"`
@@ -81,28 +81,24 @@ type AppConfig struct {
 	} `mapstructure:"task_schema"`
 
 	Withdraw struct {
-		Address              string `mapstructure:"address"`
+		RelayWalletAddress   string `mapstructure:"relay_wallet_address"`
 		MinWithdrawalAmount  uint64 `mapstructure:"min_withdrawal_amount"`
 		WithdrawalFee        uint64 `mapstructure:"withdrawal_fee"`
 		WithdrawalFeeAddress string `mapstructure:"withdrawal_fee_address"`
 	} `mapstructure:"withdraw"`
 
 	Credits struct {
-		Address string `mapstructure:"address"`
+		APIAuthAddress string `mapstructure:"api_auth_address"`
 	} `mapstructure:"credits"`
 
 	Dao struct {
-		Address string `mapstructure:"address"`
-		Percent uint64 `mapstructure:"percent"`
+		TaskFeeShareAddress string `mapstructure:"task_fee_share_address"`
+		TaskFeeSharePercent uint64 `mapstructure:"task_fee_share_percent"`
 	} `mapstructure:"dao"`
 
-	BuyQuota struct {
-		Address string `mapstructure:"address"`
-	} `mapstructure:"buy_quota"`
-
-	BuyTaskFee struct {
-		Address string `mapstructure:"address"`
-	} `mapstructure:"buy_task_fee"`
+	RelayAccount struct {
+		DepositAddress string `mapstructure:"deposit_address"`
+	} `mapstructure:"relay_account"`
 
 	MAC struct {
 		SecretKey     string `mapstructure:"secret_key"`

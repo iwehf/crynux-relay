@@ -71,19 +71,17 @@ task_schema:
   gpt_inference: "https://raw.githubusercontent.com/crynux-network/gpt-task/main/schema/gpt-inference-task.json"
   stable_diffusion_finetune_lora: "https://raw.githubusercontent.com/crynux-network/stable-diffusion-task/main/schema/stable-diffusion-finetune-lora-task.json"
 withdraw:
-  address: ""
+  relay_wallet_address: ""
   min_withdrawal_amount: 10000
   withdrawal_fee: 100
   withdrawal_fee_address: ""
 credits:
-  address: ""
+  api_auth_address: ""
 dao:
-  address: ""
-  percent: 0
-buy_quota:
-  address: ""
-buy_task_fee:
-  address: ""
+  task_fee_share_address: ""
+  task_fee_share_percent: 0
+relay_account:
+  deposit_address: ""
 mac:
   secret_key_file: "config/secrets/mac_secret_key.txt"
 qos:

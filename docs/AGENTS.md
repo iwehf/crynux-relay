@@ -7,7 +7,8 @@
 | [task_version.md](./task_version.md) | Version matching rules between task requirements and node capabilities |
 | [task_validation_and_slashing.md](./task_validation_and_slashing.md) | Validation task lifecycle, result comparison, and slashing conditions |
 | [model_predownload.md](./model_predownload.md) | Pre-download scheduling, node notification, and model availability tracking |
-| [deposit_withdraw_and_risk_control.md](./deposit_withdraw_and_risk_control.md) | Deposit and withdrawal lifecycle across Relay and Wallet, task fee balance management, and risk control checks |
+| [deposit_withdraw_and_risk_control.md](./deposit_withdraw_and_risk_control.md) | Deposit and withdrawal lifecycle across Relay and Wallet, relay account ledger, and risk control checks |
+| [task_fee_charge_and_settlement.md](./task_fee_charge_and_settlement.md) | Task fee charge, refund, settlement split, and rounding rules in relay account ledger |
 
 ## Doc Update Requirements
 

@@ -25,7 +25,7 @@ func CreateTask(ctx context.Context, db *gorm.DB, task *models.InferenceTask) er
 		if err := models.AddTotalTask(ctx, tx); err != nil {
 			return err
 		}
-		commitFunc, err := SpendTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
+		commitFunc, err := chargeTaskFromRelayAccount(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -305,7 +305,7 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 	}
 
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := RefundTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
+		commitFunc, err := refundTaskPaymentToRelayAccount(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -361,7 +361,7 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 		"qos_score":      task.QOSScore,
 	}
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := RefundTaskQuota(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
+		commitFunc, err := refundTaskPaymentToRelayAccount(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
 			return err
 		}
@@ -470,7 +470,7 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var commitFuncs []func() error
 		for _, payment := range payments {
-			commitFunc, err := sendTaskFee(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment, task.TaskType)
+			commitFunc, err := sendTaskIncome(ctx, tx, payment.taskIDCommitment, payment.address, payment.payment, task.TaskType)
 			if err != nil {
 				return err
 			}

@@ -191,7 +191,9 @@ Tasks can be aborted for several reasons:
 | `TaskAbortTimeout` | Task exceeded its deadline (creation time + 3 minutes + configured timeout) |
 | `TaskAbortModelDownloadFailed` | Model download failed on the node |
 | `TaskAbortIncorrectResult` | Result failed validation |
-| `TaskAbortTaskFeeTooLow` | Task fee was too low to attract nodes |
+| `TaskAbortTaskFeeTooLow` | Task fee was too low to attract eligible nodes |
+
+`TaskAbortTaskFeeTooLow` is not assigned by any automatic relay task processing path in current implementation. It appears only when a caller explicitly submits `POST /v1/inference_tasks/:task_id_commitment/abort_reason` with `abort_reason = TaskAbortTaskFeeTooLow`.
 
 When a task is aborted:
 - The task fee is refunded to the creator.

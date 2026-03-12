@@ -39,7 +39,7 @@ func CreateCredits(c *gin.Context, in *CreateCreditsInputWithSignature) (*Create
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Credits.Address {
+	if address != config.GetConfig().Credits.APIAuthAddress {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}

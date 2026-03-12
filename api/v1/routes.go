@@ -9,11 +9,11 @@ import (
 	"crynux_relay/api/v1/middleware"
 	"crynux_relay/api/v1/network"
 	"crynux_relay/api/v1/nodes"
+	relayaccount "crynux_relay/api/v1/relay_account"
 	"crynux_relay/api/v1/response"
 	"crynux_relay/api/v1/staking"
 	"crynux_relay/api/v1/stats"
 	taskfee "crynux_relay/api/v1/task_fee"
-	taskquota "crynux_relay/api/v1/task_quota"
 	"crynux_relay/api/v1/time"
 	"crynux_relay/api/v1/withdraw"
 	"crynux_relay/api/v1/worker"
@@ -118,7 +118,7 @@ func InitRoutes(r *fizz.Fizz) {
 	balanceGroup.GET("/:address", []fizz.OperationOption{
 		fizz.Summary("Get balance of account"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(taskfee.GetTaskFee, 200))
+	}, tonic.Handler(relayaccount.GetBalance, 200))
 
 	stakingGroup := v1g.Group("staking", "staking", "staking related APIs")
 	stakingGroup.GET("/:address", []fizz.OperationOption{
@@ -234,17 +234,27 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(incentive.GetNodeDailyIncentive, 200))
 
-	taskFeeGroup := v1g.Group("task_fee", "task_fee", "task fee related APIs")
-	taskFeeGroup.GET("/logs", []fizz.OperationOption{
-		fizz.Summary("Get task fee logs"),
+	relayAccountGroup := v1g.Group("relay_account", "relay_account", "relay account related APIs")
+	relayAccountGroup.GET("/logs", []fizz.OperationOption{
+		fizz.Summary("Get relay account logs"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(taskfee.GetTaskFeeLogs, 200))
-
-	taskQuotaGroup := v1g.Group("task_quota", "task_quota", "task quota related APIs")
-	taskQuotaGroup.GET("/:address", []fizz.OperationOption{
-		fizz.Summary("Get task quota"),
+	}, tonic.Handler(taskfee.GetRelayAccountLogs, 200))
+	relayAccountGroup.POST("/:address/withdraw", []fizz.OperationOption{
+		fizz.Summary("Create withdraw request"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(taskquota.GetTaskQuota, 200))
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(relayaccount.CreateWithdrawRequest, 200))
+	relayAccountGroup.GET("/:address/withdraw/list", []fizz.OperationOption{
+		fizz.Summary("Get withdraw records"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(relayaccount.GetWithdrawRecords, 200))
+	relayAccountGroup.GET("/:address/deposit/list", []fizz.OperationOption{
+		fizz.Summary("Get deposit records"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(relayaccount.GetDepositRecords, 200))
+	relayAccountGroup.GET("/:address/task_fee", []fizz.OperationOption{
+		fizz.Summary("Get task fee records"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+	}, middleware.JWTAuthMiddleware(), tonic.Handler(relayaccount.GetTaskFeeLedgerRecords, 200))
 
 	withdrawGroup := v1g.Group("withdraw", "withdraw", "withdraw related APIs")
 	withdrawGroup.GET("/list", []fizz.OperationOption{
@@ -275,16 +285,4 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Connect wallet"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(client.ConnectWallet, 200))
-	clientGroup.POST("/:address/withdraw", []fizz.OperationOption{
-		fizz.Summary("Create withdraw request"),
-		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.CreateWithdrawRequest, 200))
-	clientGroup.GET("/:address/withdraw/list", []fizz.OperationOption{
-		fizz.Summary("Get withdraw records"),
-		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetWithdrawRecords, 200))
-	clientGroup.GET("/:address/deposit/list", []fizz.OperationOption{
-		fizz.Summary("Get deposit records"),
-		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, middleware.JWTAuthMiddleware(), tonic.Handler(client.GetDepositRecords, 200))
 }

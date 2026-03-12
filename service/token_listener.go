@@ -115,7 +115,7 @@ func processBlock(ctx context.Context, db *gorm.DB, client *blockchain.Blockchai
 	return nil
 }
 
-func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, tx *types.Transaction, client *blockchain.BlockchainClient) error {
+func processRelayAccountDepositTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, tx *types.Transaction, client *blockchain.BlockchainClient) error {
 
 	// Check if transaction is successful
 	receipt, err := client.RpcClient.TransactionReceipt(ctx, txHash)
@@ -128,7 +128,7 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, txHash common.
 	}
 
 	// Check if already processed
-	event, err := models.GetTaskQuotaBoughtEvent(ctx, db, txHash.Hex(), client.Network)
+	event, err := models.GetRelayAccountDepositEvent(ctx, db, txHash.Hex(), client.Network)
 	if err != nil {
 		return err
 	}
@@ -142,57 +142,14 @@ func processBuyQuotaTransaction(ctx context.Context, db *gorm.DB, txHash common.
 		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
 	}
 
-	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := buyTaskQuota(ctx, db, txHash.Hex(), from.Hex(), tx.Value(), client.Network)
+	commitFunc, err := depositRelayAccount(ctx, db, txHash.Hex(), from.Hex(), tx.Value(), client.Network)
 	if err != nil {
-		log.Errorf("Failed to buy task quota for %s, network: %s, error: %v", from.Hex(), client.Network, err)
+		log.Errorf("Failed to process relay account deposit for %s, network: %s, error: %v", from.Hex(), client.Network, err)
 		return err
 	}
 
-	// Execute quota update
 	if err := commitFunc(); err != nil {
-		log.Errorf("Failed to buy task quota for %s, network: %s, error: %v", from.Hex(), client.Network, err)
-		return err
-	}
-	return nil
-}
-
-func processBuyTaskFeeTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, tx *types.Transaction, client *blockchain.BlockchainClient) error {
-	// Check if transaction is successful
-	receipt, err := client.RpcClient.TransactionReceipt(ctx, txHash)
-	if err != nil {
-		return fmt.Errorf("failed to get transaction receipt of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
-	}
-
-	if receipt.Status != types.ReceiptStatusSuccessful {
-		return nil
-	}
-
-	// Check if already processed
-	event, err := models.GetTaskFeeBoughtEvent(ctx, db, txHash.Hex(), client.Network)
-	if err != nil {
-		return err
-	}
-	if event != nil {
-		return nil
-	}
-
-	// Get sender address (need to recover from signature)
-	from, err := types.Sender(types.LatestSignerForChainID(client.ChainID), tx)
-	if err != nil {
-		return fmt.Errorf("failed to get sender address of %s, network: %s, error: %w", txHash.Hex(), client.Network, err)
-	}
-
-	// Call BuyTaskQuota to add quota for the sender
-	commitFunc, err := buyTaskFee(ctx, db, txHash.Hex(), from.Hex(), tx.Value(), client.Network)
-	if err != nil {
-		log.Errorf("Failed to buy task fee for %s, network: %s, error: %v", from.Hex(), client.Network, err)
-		return err
-	}
-
-	// Execute quota update
-	if err := commitFunc(); err != nil {
-		log.Errorf("Failed to buy task fee for %s, network: %s, error: %v", from.Hex(), client.Network, err)
+		log.Errorf("Failed to process relay account deposit for %s, network: %s, error: %v", from.Hex(), client.Network, err)
 		return err
 	}
 	return nil
@@ -213,10 +170,8 @@ func processTransaction(ctx context.Context, db *gorm.DB, txHash common.Hash, cl
 	appConfig := config.GetConfig()
 
 	// Check if transfer is to the target address
-	if strings.EqualFold(tx.To().Hex(), appConfig.BuyQuota.Address) {
-		return processBuyQuotaTransaction(ctx, db, txHash, tx, client)
-	} else if strings.EqualFold(tx.To().Hex(), appConfig.BuyTaskFee.Address) {
-		return processBuyTaskFeeTransaction(ctx, db, txHash, tx, client)
+	if strings.EqualFold(tx.To().Hex(), appConfig.RelayAccount.DepositAddress) {
+		return processRelayAccountDepositTransaction(ctx, db, txHash, tx, client)
 	}
 
 	return nil

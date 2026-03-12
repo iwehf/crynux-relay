@@ -50,7 +50,7 @@ func GetCreditsRecord(c *gin.Context, in *GetCreditsRecordInputWithSignature) (*
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Credits.Address {
+	if address != config.GetConfig().Credits.APIAuthAddress {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}
