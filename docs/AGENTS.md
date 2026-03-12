@@ -40,3 +40,16 @@ Documentation MUST NOT include:
 Documentation MUST use definitive language that can be implemented and tested:
 - Requirement keywords: MUST, MUST NOT, SHALL, SHOULD. Use SHOULD only when a requirement level is intended.
 - Exact behavior, constraints, and interfaces.
+
+## Chat Content Isolation
+
+Documentation MUST be generated from task requirements and authoritative project sources only.
+User chat instructions about removing content are editing actions, not document content.
+The final document MUST NOT restate removal instructions.
+If a content type is removed, it must be absent from the final document.
+
+Example chat cycle:
+- AI draft includes setup commands.
+- User says remove setup commands and keep only flow.
+- Wrong final doc line: This document does not include setup commands.
+- Right final doc line: Run the flow in order: prepare environment, start services, execute deposit and withdraw, then verify results.
