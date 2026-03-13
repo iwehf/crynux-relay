@@ -67,14 +67,14 @@ func M20260311(db *gorm.DB) *gormigrate.Gormigrate {
 						Quota   string `gorm:"column:quota"`
 					}
 					var quotas []TaskQuotaRow
-					if err := tx.Table("task_quotas").Select("address, quota").Find(&quotas).Error; err != nil {
+					if err := tx.Table("task_quota").Select("address, quota").Find(&quotas).Error; err != nil {
 						return err
 					}
 					quotaSums := make(map[string]*big.Int, len(quotas))
 					for _, quota := range quotas {
 						q := new(big.Int)
 						if _, ok := q.SetString(quota.Quota, 10); !ok {
-							return fmt.Errorf("invalid task_quotas.quota for address %s: %q", quota.Address, quota.Quota)
+							return fmt.Errorf("invalid task_quota.quota for address %s: %q", quota.Address, quota.Quota)
 						}
 						if total, exists := quotaSums[quota.Address]; exists {
 							total.Add(total, q)
@@ -89,7 +89,7 @@ func M20260311(db *gorm.DB) *gormigrate.Gormigrate {
 					// This is the expected ledger total after applying all quotas.
 					expectedFinalTotal := new(big.Int).Add(new(big.Int).Set(beforeTotal), quotaTotal)
 
-					// Load existing account rows only for addresses that appear in task_quotas.
+					// Load existing account rows only for addresses that appear in task_quota.
 					type RelayAccountRow struct {
 						ID      uint   `gorm:"column:id"`
 						Address string `gorm:"column:address"`
@@ -174,13 +174,16 @@ func M20260311(db *gorm.DB) *gormigrate.Gormigrate {
 					if err := m.RenameTable("task_fee_events", "relay_account_events"); err != nil {
 						return err
 					}
-					if err := m.RenameColumn("withdraw_records", "task_fee_event_id", "relay_account_event_id"); err != nil {
+					type WithdrawRecord struct {
+						RelayAccountEventID uint `gorm:"column:relay_account_event_id"`
+					}
+					if err := m.RenameColumn(&WithdrawRecord{}, "task_fee_event_id", "relay_account_event_id"); err != nil {
 						return err
 					}
-					if err := m.RenameColumn("relay_accounts", "task_fee", "balance"); err != nil {
+					if err := m.RenameColumn(&RelayAccount{}, "task_fee", "balance"); err != nil {
 						return err
 					}
-					if err := m.RenameColumn("relay_account_events", "task_fee", "amount"); err != nil {
+					if err := m.RenameColumn(&RelayAccountEvent{}, "task_fee", "amount"); err != nil {
 						return err
 					}
 					return nil
@@ -189,13 +192,16 @@ func M20260311(db *gorm.DB) *gormigrate.Gormigrate {
 			Rollback: func(tx *gorm.DB) error {
 				// Reverse table and column renames in the opposite order.
 				m := tx.Migrator()
-				if err := m.RenameColumn("withdraw_records", "relay_account_event_id", "task_fee_event_id"); err != nil {
+				type WithdrawRecord struct {
+					RelayAccountEventID uint `gorm:"column:relay_account_event_id"`
+				}
+				if err := m.RenameColumn(&WithdrawRecord{}, "relay_account_event_id", "task_fee_event_id"); err != nil {
 					return err
 				}
-				if err := m.RenameColumn("relay_account_events", "amount", "task_fee"); err != nil {
+				if err := m.RenameColumn(&RelayAccountEvent{}, "amount", "task_fee"); err != nil {
 					return err
 				}
-				if err := m.RenameColumn("relay_accounts", "balance", "task_fee"); err != nil {
+				if err := m.RenameColumn(&RelayAccount{}, "balance", "task_fee"); err != nil {
 					return err
 				}
 				if err := m.RenameTable("relay_account_events", "task_fee_events"); err != nil {

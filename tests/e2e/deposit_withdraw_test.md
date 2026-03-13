@@ -17,12 +17,14 @@ This document defines the execution flow for validating deposit and withdraw acr
 - Build Relay e2e image from the Relay repository.
 - Build Relay Wallet e2e image from the Relay Wallet repository.
 - Confirm both images are available for compose startup.
+- DO NOT reuse existing images. Always rebuild the image before starting the container.
 
 ### 2. Prepare mount folders and base config files
 
 - Follow mount-folder and base-config preparation from:
   - Relay: `tests/e2e/AGENTS.md`.
   - Relay Wallet: `tests/e2e/AGENTS.md` in the Relay Wallet repository.
+- Always reset the database (delete all the mounted database files) before starting the test.
 
 ### 3. Configure runtime integration in mounted config files
 
@@ -36,10 +38,15 @@ This document defines the execution flow for validating deposit and withdraw acr
   - Relay `withdraw.withdrawal_fee` MUST be set to `1`.
   - Relay Wallet minimum accepted deposit amount MUST be set to `5`.
   - Relay Wallet minimum accepted withdrawal amount MUST be set to `5`.
+- Before starting containers, set Relay blockchain scan start heights in the mounted Relay config:
+  - Use Crynux MCP `get_latest_block_number` with `network = dymension`, then set Relay `blockchains.dymension.start_block_num` to the returned `block_number`.
+  - Use Crynux MCP `get_latest_block_number` with `network = near`, then set Relay `blockchains.near.start_block_num` to the returned `block_number`.
+  - The start block values for different networks MUST be configured independently and MUST NOT be copied from one network to another.
 
 ### 4. Configure wallets and keys with Crynux MCP
 
 - Generate all private keys with Crynux MCP and use the fixed business names below.
+- Private keys MUST be exported directly to target files using the Crynux MCP `export_key` tool, and the workflow MUST NOT read, print, or otherwise expose private key contents.
 - Prepare accounts with the following table:
 | Name | Type | Purpose | Required mapping | Minimum test-token funding for 10 runs |
 |------|------|---------|------------------|----------------------------------------|
@@ -83,6 +90,7 @@ This document defines the execution flow for validating deposit and withdraw acr
 
 ### 8. Execute deposit scenario
 
+- All Crynux MCP calls that query relay information MUST include `relay_base_url`, and this value MUST point to the local relay service endpoint in this test environment.
 - Client deposit transaction amount MUST be `5` test token units.
 - Send an on-chain transfer to Relay deposit address using Crynux MCP.
 - After sending the transfer transaction, wait about `10` seconds before checking confirmation and relay ingestion.
@@ -92,6 +100,7 @@ This document defines the execution flow for validating deposit and withdraw acr
 
 ### 9. Execute withdraw scenario
 
+- All Crynux MCP calls that query relay information MUST include `relay_base_url`, and this value MUST point to the local relay service endpoint in this test environment.
 - Client withdrawal request amount MUST be `5` test token units.
 - With `withdrawal_fee = 1`, Relay Wallet MUST pay out `4` test token units to the user.
 - Submit a withdrawal request for the same client account using Crynux MCP.
