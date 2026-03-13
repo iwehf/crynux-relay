@@ -72,8 +72,8 @@ task_schema:
   stable_diffusion_finetune_lora: "https://raw.githubusercontent.com/crynux-network/stable-diffusion-task/main/schema/stable-diffusion-finetune-lora-task.json"
 withdraw:
   relay_wallet_address: ""
-  min_withdrawal_amount: 10000
-  withdrawal_fee: 100
+  min_withdrawal_amount: 5
+  withdrawal_fee: 1
   withdrawal_fee_address: ""
 credits:
   api_auth_address: ""
