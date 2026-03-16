@@ -64,7 +64,7 @@ func GetTaskCountLineChart(_ *gin.Context, input *GetTaskCountLineChartParams) (
 	var allTaskCounts []models.TaskCount
 	stmt := config.GetDB().Model(&models.TaskCount{}).Where("start >= ?", start).Where("start < ?", end)
 	if input.TaskType == ImageTaskType {
-		stmt = stmt.Where("task_type = ?", models.TaskTypeSD)
+		stmt = stmt.Where("task_type IN ?", []models.TaskType{models.TaskTypeSD, models.TaskTypeSDFTLora})
 	} else if input.TaskType == TextTaskType {
 		stmt = stmt.Where("task_type = ?", models.TaskTypeLLM)
 	}
