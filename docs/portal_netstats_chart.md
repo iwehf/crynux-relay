@@ -159,13 +159,20 @@ If any stage has not been reached, the corresponding timestamp MUST remain `NULL
   - Last 1 hour by `created_at`
 - Aggregation:
   - Filter rows with `task_fee IS NOT NULL` and `task_fee > 0`
-  - Compute min and max fee
-  - Build 10 bins with logarithmic step:
-    - `bin_size = 10^floor(log10(max-min))` when `min < max`
-  - Count rows per bin and return `{task_fees[], task_counts[]}`
-  - When `min == max`, produce one populated bin and nine zero bins
+  - Parse each `task_fee` as wei base-10 integer in Relay and compute min/max in Go.
+  - Build 10 bins with decimal-order step:
+    - `bin_size = 10^(digits(max-min)-1)` when `min < max`
+    - `bin_size = 10^(digits(min)-1)` when `min == max`
+  - Bin start is `floor(min / bin_size) * bin_size`
+  - Return `{task_fees[], task_counts[]}` where:
+    - `task_fees[]` are wei integer strings (bucket start values)
+    - `task_counts[]` are bucket counts
+  - If no qualified rows exist in the 1-hour window, return 10 zero buckets
 - Note:
-  - This endpoint reads raw task rows directly and does not use pre-aggregated stats tables
+  - This endpoint reads raw task rows directly and does not use pre-aggregated stats tables.
+  - This endpoint uses in-memory per-process cache keyed by `task_type` with TTL 60 seconds.
+  - Performance is primarily determined by row count in the 1-hour window, not total historical table size when the `created_at` filter is index-backed.
+  - Current operational reference: around 5,000 tasks per hour is within acceptable range for on-demand computation.
 
 <a id="api-incentive-line-chart"></a>
 ### API: `GET /v1/stats/line_chart/incentive`
