@@ -4,7 +4,7 @@ import (
 	"crynux_relay/api/v1/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,19 +34,20 @@ func GetTaskCountLineChart(_ *gin.Context, input *GetTaskCountLineChartParams) (
 	var start, end time.Time
 	var duration time.Duration
 	var count int
-	if input.Period == UnitHour {
+	switch input.Period {
+	case UnitHour:
 		duration = time.Hour
 		count = 24
 		if input.Count != nil {
 			count = *input.Count
 		}
-	} else if input.Period == UnitDay {
+	case UnitDay:
 		duration = 24 * time.Hour
 		count = 15
 		if input.Count != nil {
 			count = *input.Count
 		}
-	} else {
+	default:
 		duration = 7 * 24 * time.Hour
 		count = 8
 		if input.Count != nil {
@@ -63,9 +64,10 @@ func GetTaskCountLineChart(_ *gin.Context, input *GetTaskCountLineChartParams) (
 
 	var allTaskCounts []models.TaskCount
 	stmt := config.GetDB().Model(&models.TaskCount{}).Where("start >= ?", start).Where("start < ?", end)
-	if input.TaskType == ImageTaskType {
+	switch input.TaskType {
+	case ImageTaskType:
 		stmt = stmt.Where("task_type IN ?", []models.TaskType{models.TaskTypeSD, models.TaskTypeSDFTLora})
-	} else if input.TaskType == TextTaskType {
+	case TextTaskType:
 		stmt = stmt.Where("task_type = ?", models.TaskTypeLLM)
 	}
 	stmt = stmt.Order("id")
@@ -94,9 +96,7 @@ func GetTaskCountLineChart(_ *gin.Context, input *GetTaskCountLineChartParams) (
 		timestamps = append(timestamps, timestamp)
 	}
 
-	sort.Slice(timestamps, func(i, j int) bool {
-		return timestamps[i] < timestamps[j]
-	})
+	slices.Sort(timestamps)
 
 	counts := make([]int64, 0)
 	for _, timestamp := range timestamps {

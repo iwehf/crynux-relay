@@ -48,6 +48,7 @@ This document defines the execution flow for validating deposit and withdraw acr
 - Generate all private keys with Crynux MCP and use the fixed business names below.
 - Private keys MUST be exported directly to target files using the Crynux MCP `export_key` tool, and the workflow MUST NOT read, print, or otherwise expose private key contents.
 - Prepare accounts with the following table:
+
 | Name | Type | Purpose | Required mapping | Minimum test-token funding for 10 runs |
 |------|------|---------|------------------|----------------------------------------|
 | `relay_chain_system` | private key | Relay blockchain signer key | Relay `blockchains.dymension.account.address` and `blockchains.near.account.address` MUST be derived from this key. Relay `config/secrets/blockchain_system_private_key.txt` MUST store this key. | `0` |
@@ -58,6 +59,7 @@ This document defines the execution flow for validating deposit and withdraw acr
 | `relay_account.deposit_address` | address | Deposit target address | Relay `relay_account.deposit_address` MUST be set to this address. | `0` |
 | `withdraw.withdrawal_fee_address` | address | Withdrawal fee receiver address | Relay `withdraw.withdrawal_fee_address` MUST be set to this address. | `0` |
 | `dao.task_fee_share_address` | address | DAO task fee share receiver address | Relay `dao.task_fee_share_address` MUST be set to this address. | `0` |
+
 - Top up balances before container startup:
   - `relay_wallet_chain_system` account MUST hold enough native tokens on each configured network for gas and withdrawal payouts.
   - `client_e2e_user` account MUST hold enough native tokens for deposit transfer amount, gas, and any signed on-chain actions used by the test workflow.

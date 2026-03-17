@@ -28,19 +28,21 @@ type GetTaskExecutionTimeHistogramResponse struct {
 func GetTaskExecutionTimeHistogram(_ *gin.Context, input *GetTaskExecutionTimeHistogramInput) (*GetTaskExecutionTimeHistogramResponse, error) {
 	now := time.Now().UTC()
 	var start time.Time
-	if input.Period == UnitHour {
+	switch input.Period {
+	case UnitHour:
 		start = now.Truncate(time.Hour).Add(-time.Hour)
-	} else if input.Period == UnitDay {
+	case UnitDay:
 		start = now.Truncate(time.Hour).Add(-24 * time.Hour)
-	} else {
+	default:
 		start = now.Truncate(time.Hour).Add(-7 * 24 * time.Hour)
 	}
 
 	timeout := 300
 	subQuery := config.GetDB().Model(&models.TaskExecutionTimeCount{}).Select("seconds, count").Where("start >= ?", start).Where("seconds < ?", timeout)
-	if input.TaskType == ImageTaskType {
+	switch input.TaskType {
+	case ImageTaskType:
 		subQuery = subQuery.Where("task_type = ?", models.TaskTypeSD)
-	} else if input.TaskType == TextTaskType {
+	case TextTaskType:
 		subQuery = subQuery.Where("task_type = ?", models.TaskTypeLLM)
 	}
 

@@ -43,9 +43,10 @@ func GetTaskFeeHistogram(_ *gin.Context, input *GetTaskFeeHistogramParams) (*Get
 	start := end.Add(-time.Hour)
 
 	stmt := config.GetDB().Model(&models.InferenceTask{}).Where("created_at >= ?", start).Where("created_at < ?", end).Where("task_fee IS NOT NULL").Where("task_fee > ?", 0)
-	if input.TaskType == ImageTaskType {
+	switch input.TaskType {
+	case ImageTaskType:
 		stmt = stmt.Where("task_type IN ?", []models.TaskType{models.TaskTypeSD, models.TaskTypeSDFTLora})
-	} else if input.TaskType == TextTaskType {
+	case TextTaskType:
 		stmt = stmt.Where("task_type = ?", models.TaskTypeLLM)
 	}
 
