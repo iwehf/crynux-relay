@@ -84,6 +84,7 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 	candidateEvents := make([]models.RelayAccountEvent, 0)
 	taskIDSet := make(map[string]struct{})
 	withdrawIDSet := make(map[uint]struct{})
+	balanceAddressSet := make(map[string]struct{})
 	txHashes := make([]string, 0)
 	networks := make([]string, 0)
 
@@ -108,6 +109,9 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 				continue
 			}
 			taskIDSet[reasons[1]] = struct{}{}
+			if event.Type == models.RelayAccountEventTypeTaskPayment {
+				balanceAddressSet[event.Address] = struct{}{}
+			}
 		case models.RelayAccountEventTypeWithdraw, models.RelayAccountEventTypeWithdrawRefund, models.RelayAccountEventTypeWithdrawFeeIncome:
 			if len(reasons) != 2 {
 				invalidEvents = append(invalidEvents, event)
@@ -119,6 +123,9 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 				continue
 			}
 			withdrawIDSet[uint(withdrawID)] = struct{}{}
+			if event.Type == models.RelayAccountEventTypeWithdraw {
+				balanceAddressSet[event.Address] = struct{}{}
+			}
 		default:
 			invalidEvents = append(invalidEvents, event)
 			continue
@@ -133,6 +140,10 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 	withdrawIDs := make([]uint, 0, len(withdrawIDSet))
 	for withdrawID := range withdrawIDSet {
 		withdrawIDs = append(withdrawIDs, withdrawID)
+	}
+	balanceAddresses := make([]string, 0, len(balanceAddressSet))
+	for address := range balanceAddressSet {
+		balanceAddresses = append(balanceAddresses, address)
 	}
 
 	var tasks []models.InferenceTask
@@ -165,6 +176,24 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 		withdrawMap[record.ID] = record
 	}
 
+	var relayAccounts []models.RelayAccount
+	if len(balanceAddresses) > 0 {
+		dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := db.WithContext(dbCtx).
+			Where("address IN (?)", balanceAddresses).
+			Find(&relayAccounts).Error; err != nil {
+			return nil, nil, err
+		}
+	}
+	relayBalanceMap := make(map[string]*big.Int, len(balanceAddresses))
+	for _, address := range balanceAddresses {
+		relayBalanceMap[address] = big.NewInt(0)
+	}
+	for _, account := range relayAccounts {
+		relayBalanceMap[account.Address] = new(big.Int).Set(&account.Balance.Int)
+	}
+
 	validTxHashes := make(map[string]struct{})
 	for i, txHash := range txHashes {
 		network := networks[i]
@@ -191,6 +220,10 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 		switch event.Type {
 		case models.RelayAccountEventTypeDeposit:
 			if _, ok := validTxHashes[reasons[1]]; ok {
+				balance := relayBalanceMap[event.Address]
+				if balance != nil {
+					balance.Add(balance, &event.Amount.Int)
+				}
 				validEvents = append(validEvents, event)
 			} else {
 				invalidEvents = append(invalidEvents, event)
@@ -200,6 +233,14 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 			if !ok || event.Amount.Int.Cmp(&task.TaskFee.Int) != 0 {
 				invalidEvents = append(invalidEvents, event)
 				continue
+			}
+			balance := relayBalanceMap[event.Address]
+			if balance != nil && balance.Cmp(&event.Amount.Int) < 0 {
+				invalidEvents = append(invalidEvents, event)
+				continue
+			}
+			if balance != nil {
+				balance.Sub(balance, &event.Amount.Int)
 			}
 			validEvents = append(validEvents, event)
 		case models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare:
@@ -212,6 +253,10 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 				invalidEvents = append(invalidEvents, event)
 				continue
 			}
+			balance := relayBalanceMap[event.Address]
+			if balance != nil {
+				balance.Add(balance, &event.Amount.Int)
+			}
 			validEvents = append(validEvents, event)
 		case models.RelayAccountEventTypeTaskRefund:
 			task, ok := taskMap[reasons[1]]
@@ -223,10 +268,33 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 				invalidEvents = append(invalidEvents, event)
 				continue
 			}
+			balance := relayBalanceMap[event.Address]
+			if balance != nil {
+				balance.Add(balance, &event.Amount.Int)
+			}
 			validEvents = append(validEvents, event)
-		case models.RelayAccountEventTypeWithdraw, models.RelayAccountEventTypeWithdrawRefund, models.RelayAccountEventTypeWithdrawFeeIncome:
+		case models.RelayAccountEventTypeWithdraw:
+			withdrawID, _ := strconv.ParseUint(reasons[1], 10, 64)
+			if _, ok := withdrawMap[uint(withdrawID)]; !ok {
+				invalidEvents = append(invalidEvents, event)
+				continue
+			}
+			balance := relayBalanceMap[event.Address]
+			if balance != nil && balance.Cmp(&event.Amount.Int) < 0 {
+				invalidEvents = append(invalidEvents, event)
+				continue
+			}
+			if balance != nil {
+				balance.Sub(balance, &event.Amount.Int)
+			}
+			validEvents = append(validEvents, event)
+		case models.RelayAccountEventTypeWithdrawRefund, models.RelayAccountEventTypeWithdrawFeeIncome:
 			withdrawID, _ := strconv.ParseUint(reasons[1], 10, 64)
 			if _, ok := withdrawMap[uint(withdrawID)]; ok {
+				balance := relayBalanceMap[event.Address]
+				if balance != nil {
+					balance.Add(balance, &event.Amount.Int)
+				}
 				validEvents = append(validEvents, event)
 			} else {
 				invalidEvents = append(invalidEvents, event)
