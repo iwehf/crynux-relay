@@ -144,7 +144,7 @@ On fulfill:
 On reject:
 
 1. require `withdraw_records.local_status = Processed`.
-2. set withdraw `Status=Failed` and local status back to `Pending`.
+2. set withdraw `Status=Failed` and keep local status `Processed`.
 3. create `WithdrawRefund` event for `amount + fee`.
 4. apply in-memory cache refund to requester.
 5. background processor later projects `WithdrawRefund` into `relay_accounts`.

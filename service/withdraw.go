@@ -129,7 +129,7 @@ func RejectWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return ErrWithdrawRequestNotPending
 		}
 
-		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Update("local_status", models.WithdrawLocalStatusPending).Error; err != nil {
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Error; err != nil {
 			return err
 		}
 

@@ -138,7 +138,7 @@ Withdraw processing SHALL be interpreted as one continuous pipeline:
    - `withdraw_records.status` remains user-facing:
      - Fulfill sets `status = Success`.
      - Reject sets `status = Failed`.
-   - On reject, Relay sets `local_status = Pending` and creates compensating refund event flow.
+   - On reject, Relay keeps `local_status = Processed` and creates compensating refund event flow.
 
 4. Outcome settlement stays event-driven.
    - Fulfill with non-zero fee creates `WithdrawFeeIncome` event (`Pending`), updates runtime cache, then background sync projects to `relay_accounts` and marks event `Processed`.
