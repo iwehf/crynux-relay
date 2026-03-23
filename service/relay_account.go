@@ -261,13 +261,25 @@ func processPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events [
 
 	if len(invalidEvents) > 0 {
 		invalidIDs := make([]uint, 0, len(invalidEvents))
+		invalidWithdrawEventIDs := make([]uint, 0)
 		for _, event := range invalidEvents {
 			invalidIDs = append(invalidIDs, event.ID)
+			if event.Type == models.RelayAccountEventTypeWithdraw {
+				invalidWithdrawEventIDs = append(invalidWithdrawEventIDs, event.ID)
+			}
 		}
 		if err := db.Model(&models.RelayAccountEvent{}).
 			Where("id IN (?)", invalidIDs).
 			Update("status", models.RelayAccountEventStatusInvalid).Error; err != nil {
 			return err
+		}
+		if len(invalidWithdrawEventIDs) > 0 {
+			if err := db.Model(&models.WithdrawRecord{}).
+				Where("relay_account_event_id IN (?)", invalidWithdrawEventIDs).
+				Where("local_status = ?", models.WithdrawLocalStatusPending).
+				Update("local_status", models.WithdrawLocalStatusInvalid).Error; err != nil {
+				return err
+			}
 		}
 	}
 
