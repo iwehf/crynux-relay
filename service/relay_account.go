@@ -45,18 +45,6 @@ func InitRelayAccountCache(ctx context.Context, db *gorm.DB) error {
 			return err
 		}
 	}
-	for {
-		records, err := getPendingWithdrawRecords(ctx, db, 50)
-		if err != nil {
-			return err
-		}
-		if len(records) == 0 {
-			break
-		}
-		if err := processPendingWithdrawRecords(ctx, db, records); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -89,21 +77,6 @@ func getPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, limit int) (
 		return nil, err
 	}
 	return events, nil
-}
-
-func getPendingWithdrawRecords(ctx context.Context, db *gorm.DB, limit int) ([]models.WithdrawRecord, error) {
-	var records []models.WithdrawRecord
-	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	err := db.WithContext(dbCtx).
-		Where("local_status = ?", models.WithdrawLocalStatusPending).
-		Order("id").
-		Limit(limit).
-		Find(&records).Error
-	if err != nil {
-		return nil, err
-	}
-	return records, nil
 }
 
 func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events []models.RelayAccountEvent) ([]models.RelayAccountEvent, []models.RelayAccountEvent, error) {
@@ -374,56 +347,44 @@ func processPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events [
 			return err
 		}
 
+		withdrawEventIDs := make([]uint, 0)
+		for _, event := range validEvents {
+			if event.Type == models.RelayAccountEventTypeWithdraw {
+				withdrawEventIDs = append(withdrawEventIDs, event.ID)
+			}
+		}
+		if len(withdrawEventIDs) > 0 {
+			var records []models.WithdrawRecord
+			if err := tx.Model(&models.WithdrawRecord{}).
+				Where("relay_account_event_id IN (?)", withdrawEventIDs).
+				Where("local_status = ?", models.WithdrawLocalStatusPending).
+				Find(&records).Error; err != nil {
+				return err
+			}
+
+			if len(records) > 0 {
+				recordIDs := make([]uint, 0, len(records))
+				var recordMACCases string
+				for _, record := range records {
+					recordIDs = append(recordIDs, record.ID)
+					recordMAC := utils.GenerateMAC([]byte(record.MACString()), appConfig.MAC.SecretKey)
+					recordMACCases += fmt.Sprintf(" WHEN id = %d THEN '%s'", record.ID, recordMAC)
+				}
+
+				if err := tx.Model(&models.WithdrawRecord{}).
+					Where("id IN (?)", recordIDs).
+					Where("local_status = ?", models.WithdrawLocalStatusPending).
+					Updates(map[string]interface{}{
+						"mac":          gorm.Expr("CASE" + recordMACCases + " END"),
+						"local_status": models.WithdrawLocalStatusProcessed,
+					}).Error; err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
-}
-
-func processPendingWithdrawRecords(ctx context.Context, db *gorm.DB, records []models.WithdrawRecord) error {
-	lastProcessedEventID, err := models.GetLastProcessedRelayAccountEventID(ctx, db)
-	if err != nil {
-		return err
-	}
-
-	invalidIDs := make([]uint, 0)
-	validIDs := make([]uint, 0)
-	for _, record := range records {
-		if record.RelayAccountEventID == 0 || record.RelayAccountEventID > lastProcessedEventID {
-			continue
-		}
-		validIDs = append(validIDs, record.ID)
-	}
-	if len(validIDs) > 0 {
-		appConfig := config.GetConfig()
-		recordMACs := make(map[uint]string, len(validIDs))
-		for _, record := range records {
-			if record.RelayAccountEventID == 0 || record.RelayAccountEventID > lastProcessedEventID {
-				continue
-			}
-			recordMACs[record.ID] = utils.GenerateMAC([]byte(record.MACString()), appConfig.MAC.SecretKey)
-		}
-
-		var macCases string
-		for recordID, mac := range recordMACs {
-			macCases += fmt.Sprintf(" WHEN id = %d THEN '%s'", recordID, mac)
-		}
-		if err := db.Model(&models.WithdrawRecord{}).
-			Where("id IN (?)", validIDs).
-			Where("local_status = ?", models.WithdrawLocalStatusPending).
-			Updates(map[string]interface{}{
-				"mac":          gorm.Expr("CASE" + macCases + " END"),
-				"local_status": models.WithdrawLocalStatusProcessed,
-			}).Error; err != nil {
-			return err
-		}
-	}
-	if len(invalidIDs) > 0 {
-		if err := db.Model(&models.WithdrawRecord{}).
-			Where("id IN (?)", invalidIDs).
-			Update("local_status", models.WithdrawLocalStatusInvalid).Error; err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func syncRelayAccountsToDB(ctx context.Context, db *gorm.DB) error {
@@ -443,20 +404,6 @@ func syncRelayAccountsToDB(ctx context.Context, db *gorm.DB) error {
 				}
 				if err := processPendingRelayAccountEvents(ctx, db, events); err != nil {
 					log.Errorf("Failed to process pending relay account events: %v", err)
-					break
-				}
-			}
-			for {
-				records, err := getPendingWithdrawRecords(ctx, db, 50)
-				if err != nil {
-					log.Errorf("Failed to load pending withdraw records: %v", err)
-					break
-				}
-				if len(records) == 0 {
-					break
-				}
-				if err := processPendingWithdrawRecords(ctx, db, records); err != nil {
-					log.Errorf("Failed to process pending withdraw records: %v", err)
 					break
 				}
 			}

@@ -18,6 +18,8 @@ Relay uses a single ledger model:
 - `relay_accounts`: per-address current balance.
 - `relay_account_events`: append-only balance change log.
 
+For the detailed processing pipeline from event creation to in-memory cache update and DB projection, see [relay_account_event_cache_flow.md](./relay_account_event_cache_flow.md).
+
 Relay account events MUST be the only source used by Relay Wallet to reconstruct balances.
 
 ### Relay Account Event Types
@@ -106,6 +108,48 @@ When wallet rejects a withdrawal, Relay MUST:
 2. Create `WithdrawRefund` event for requester.
 3. Increase requester relay account balance by `amount + withdrawal_fee`.
 
+### Withdraw Local Status and Event Status Relationship
+
+This flow uses three status fields with different business purposes:
+
+- `withdraw_records.status`: user-facing withdrawal outcome (`Pending`, `Success`, `Failed`).
+- `withdraw_records.local_status`: Relay-side execution gate for wallet handoff (`Pending`, `Processed`, `Invalid`).
+- `relay_account_events.status`: background event processing state (`Pending`, `Processed`, `Invalid`).
+
+Withdraw processing SHALL be interpreted as one continuous pipeline:
+
+1. Client submits a withdraw request.
+   - Relay creates one `withdraw_records` row.
+   - `withdraw_records.status = Pending` means user-visible processing is not finished.
+   - `withdraw_records.local_status = Pending` means the in-memory cache update is already applied, but DB projection is not finally confirmed yet and must wait for background syncer confirmation.
+   - Relay creates one `Withdraw` event with `relay_account_events.status = Pending`.
+   - Relay stores event ID in `withdraw_records.relay_account_event_id`.
+   - Relay applies runtime in-memory cache deduction immediately.
+
+2. Background sync handles pending events.
+   - Background sync reads `relay_account_events.status = Pending`.
+   - It validates event binding and projects balance change into `relay_accounts`.
+   - It sets `Withdraw` event status to `Processed`.
+   - In the same transaction, Relay promotes linked `withdraw_records.local_status = Processed` and writes withdraw record MAC.
+   - Meaning: Relay-side accounting and local readiness are done, and wallet execution is now allowed.
+
+3. Wallet executes and reports result.
+   - Before fulfill/reject, Relay MUST require `withdraw_records.local_status = Processed`.
+   - `withdraw_records.status` remains user-facing:
+     - Fulfill sets `status = Success`.
+     - Reject sets `status = Failed`.
+   - On reject, Relay sets `local_status = Pending` and creates compensating refund event flow.
+
+4. Outcome settlement stays event-driven.
+   - Fulfill with non-zero fee creates `WithdrawFeeIncome` event (`Pending`), updates runtime cache, then background sync projects to `relay_accounts` and marks event `Processed`.
+   - Reject creates `WithdrawRefund` event (`Pending`), updates runtime cache, then background sync projects to `relay_accounts` and marks event `Processed`.
+
+This design solves three different requirements at the same time:
+
+- user-facing progress and result tracking (`withdraw_records.status`)
+- wallet execution safety gate (`withdraw_records.local_status`)
+- auditable and replayable accounting pipeline (`relay_account_events.status` + `relay_accounts`)
+
 ## Relay Wallet Synchronization Rules
 
 Relay Wallet MUST synchronize in event-order:
@@ -127,7 +171,7 @@ When Relay Wallet skips applying an event type, it MUST still:
 2. Keep event-order continuity.
 3. Advance sync checkpoint by event ID.
 
-`withdraw_records.relay_account_event_id` MUST be treated as a synchronization watermark.
+`withdraw_records.relay_account_event_id` MUST be treated as the event anchor used to bind each withdrawal request to its `Withdraw` ledger event.
 
 ## Integrity and Authentication
 
