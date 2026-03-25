@@ -34,7 +34,7 @@ blockchains:
     chain_id: 1313161573
     account:
       address: ""
-      private_key_file: "config/secrets/dym_private_key.txt"
+      private_key_file: "config/secrets/blockchain_system_private_key.txt"
     contracts:
       benefit_address: "0xa4AC846337794C93d68D387Be77663e32AD415bb"
       node_staking: "0xf76C3f19c8976d0Bc49d48718669b99747b1837e"
@@ -53,7 +53,7 @@ blockchains:
     chain_id: 1313161574
     account:
       address: ""
-      private_key_file: "config/secrets/near_private_key.txt"
+      private_key_file: "config/secrets/blockchain_system_private_key.txt"
     contracts:
       benefit_address: "0xf57a8f8F7ab52EBD7971A65e9B44C767d3119c4f"
       node_staking: "0xd20403b243b0109809BEAa93Ac38f0e3b30039C0"
@@ -72,14 +72,14 @@ task_schema:
   stable_diffusion_finetune_lora: "https://raw.githubusercontent.com/crynux-network/stable-diffusion-task/main/schema/stable-diffusion-finetune-lora-task.json"
 withdraw:
   relay_wallet_address: ""
-  min_withdrawal_amount: 10000
-  withdrawal_fee: 100
+  min_withdrawal_amount: 5
+  withdrawal_fee: 1
   withdrawal_fee_address: ""
 credits:
   api_auth_address: ""
 dao:
   task_fee_share_address: ""
-  task_fee_share_percent: 0
+  task_fee_share_percent: 2
 relay_account:
   deposit_address: ""
 mac:

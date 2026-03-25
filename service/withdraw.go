@@ -21,7 +21,7 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 	defer cancel()
 
 	withdrawalFee := utils.EtherToWei(big.NewInt(0).SetUint64(appConfig.Withdraw.WithdrawalFee))
-	if address == appConfig.Withdraw.WithdrawalFeeAddress || address == appConfig.Dao.Address {
+	if address == appConfig.Withdraw.WithdrawalFeeAddress || address == appConfig.Dao.TaskFeeShareAddress {
 		withdrawalFee = big.NewInt(0)
 	}
 	record := &models.WithdrawRecord{
@@ -37,20 +37,17 @@ func Withdraw(ctx context.Context, db *gorm.DB, address, benefitAddress string, 
 	totalAmount := big.NewInt(0).Add(amount, withdrawalFee)
 
 	if err := db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
-		commitFunc, err := withdrawTaskFee(ctx, tx, address, totalAmount)
-		if err != nil {
-			return err
-		}
-
-		var taskFeeEvent models.TaskFeeEvent
-		if err := tx.Model(&models.TaskFeeEvent{}).Where("address = ?", address).Last(&taskFeeEvent).Error; err != nil && err != gorm.ErrRecordNotFound {
-			return err
-		}
-		record.TaskFeeEventID = taskFeeEvent.ID
-
 		if err := tx.Create(record).Error; err != nil {
 			return err
 		}
+		eventID, commitFunc, err := chargeWithdrawFromRelayAccount(ctx, tx, record.ID, address, totalAmount)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", record.ID).Update("relay_account_event_id", eventID).Error; err != nil {
+			return err
+		}
+		record.RelayAccountEventID = eventID
 		if err := commitFunc(); err != nil {
 			return err
 		}
@@ -95,7 +92,7 @@ func FulfillWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint, txHash s
 		}
 
 		if record.WithdrawalFee.Cmp(big.NewInt(0)) > 0 {
-			commitFunc, err := fulfillWithdrawTaskFee(ctx, tx, record.ID, appConfig.Withdraw.WithdrawalFeeAddress, &record.WithdrawalFee.Int)
+			commitFunc, err := fulfillWithdrawFeeIncome(ctx, tx, record.ID, appConfig.Withdraw.WithdrawalFeeAddress, &record.WithdrawalFee.Int)
 			if err != nil {
 				return err
 			}
@@ -132,13 +129,13 @@ func RejectWithdraw(ctx context.Context, db *gorm.DB, withdrawID uint) error {
 			return ErrWithdrawRequestNotPending
 		}
 
-		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Update("local_status", models.WithdrawLocalStatusPending).Error; err != nil {
+		if err := tx.Model(&models.WithdrawRecord{}).Where("id = ?", withdrawID).Update("status", models.WithdrawStatusFailed).Error; err != nil {
 			return err
 		}
 
 		totalAmount := big.NewInt(0).Add(&record.Amount.Int, &record.WithdrawalFee.Int)
 
-		commitFunc, err := rejectWithdrawTaskFee(ctx, tx, record.Address, totalAmount)
+		commitFunc, err := rejectWithdrawToRelayAccount(ctx, tx, record.ID, record.Address, totalAmount)
 		if err != nil {
 			return err
 		}

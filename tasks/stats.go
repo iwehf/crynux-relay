@@ -45,7 +45,7 @@ func getTaskCounts(ctx context.Context, start, end time.Time) ([]*models.TaskCou
 			if err := config.GetDB().WithContext(dbCtx).Model(&models.InferenceTask{}).
 				Where("created_at >= ?", start).Where("created_at < ?", end).
 				Where("task_type = ?", taskType).
-				Where("(status = ? OR status = ?)", models.TaskEndSuccess, models.TaskEndGroupRefund).
+				Where("status IN ?", []models.TaskStatus{models.TaskEndSuccess, models.TaskEndGroupSuccess, models.TaskEndGroupRefund}).
 				Count(&successCount).Error; err != nil {
 				return err
 			}
@@ -244,6 +244,7 @@ func StartStatsTaskExecutionTimeCount(ctx context.Context) {
 			err := ctx.Err()
 			log.Errorf("Stats: stop counting task execution time count due to %v", err)
 			ticker.Stop()
+			return
 		case <-ticker.C:
 			func() {
 				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -352,6 +353,7 @@ func StartStatsTaskUploadResultTimeCount(ctx context.Context) {
 			err := ctx.Err()
 			log.Errorf("Stats: stop counting task upload result time count due to %v", err)
 			ticker.Stop()
+			return
 		case <-ticker.C:
 			func() {
 				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -460,6 +462,7 @@ func StartStatsTaskWaitingTimeCount(ctx context.Context) {
 			err := ctx.Err()
 			log.Errorf("Stats: stop counting task waiting time count due to %v", err)
 			ticker.Stop()
+			return
 		case <-ticker.C:
 			func() {
 				ctx1, cancel := context.WithTimeout(ctx, 5*time.Minute)

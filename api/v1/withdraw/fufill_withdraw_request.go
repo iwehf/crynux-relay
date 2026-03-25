@@ -34,7 +34,7 @@ func FulfillWithdrawRequest(c *gin.Context, in *FulfillWithdrawRequestInputWithS
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Withdraw.Address {
+	if address != config.GetConfig().Withdraw.RelayWalletAddress {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}

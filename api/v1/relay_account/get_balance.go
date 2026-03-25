@@ -1,4 +1,4 @@
-package taskfee
+package relayaccount
 
 import (
 	"crynux_relay/api/v1/response"
@@ -9,21 +9,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type GetTaskFeeInput struct {
+type GetBalanceInput struct {
 	Address string `path:"address" json:"address" description:"Address of account"`
 }
 
-type GetTaskFeeResponse struct {
+type GetBalanceResponse struct {
 	response.Response
 	Data models.BigInt `json:"data"`
 }
 
-func GetTaskFee(c *gin.Context, in *GetTaskFeeInput) (*GetTaskFeeResponse, error) {
-	taskFee, err := service.GetTaskFee(c.Request.Context(), config.GetDB(), in.Address)
+func GetBalance(c *gin.Context, in *GetBalanceInput) (*GetBalanceResponse, error) {
+	balance, err := service.GetRelayAccountBalance(c.Request.Context(), config.GetDB(), in.Address)
 	if err != nil {
 		return nil, err
 	}
-	return &GetTaskFeeResponse{
-		Data: models.BigInt{Int: *taskFee},
+	return &GetBalanceResponse{
+		Data: models.BigInt{Int: *balance},
 	}, nil
 }

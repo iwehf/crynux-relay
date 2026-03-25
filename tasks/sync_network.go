@@ -63,12 +63,12 @@ func getNodeData(ctx context.Context, db *gorm.DB, offset, limit int) ([]models.
 	for i, nodeData := range nodesData {
 		node, ok := nodesMap[nodeData.Address]
 		if ok {
-			taskFee, err := service.GetTaskFee(ctx, db, nodeData.Address)
+			balance, err := service.GetRelayAccountBalance(ctx, db, nodeData.Address)
 			if err != nil {
 				log.Errorf("SyncNetwork: error getting task fee %v", err)
 				return nil, err
 			}
-			nodesData[i].Balance = models.BigInt{Int: *taskFee}
+			nodesData[i].Balance = models.BigInt{Int: *balance}
 			nodesData[i].QoS = node.QOSScore
 			nodesData[i].Staking = models.BigInt{Int: node.StakeAmount.Int}
 			nodesData[i].HealthBase = node.HealthBase

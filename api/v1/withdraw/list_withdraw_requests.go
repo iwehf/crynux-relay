@@ -24,15 +24,15 @@ type GetWithdrawRequestsInputWithSignature struct {
 }
 
 type WithdrawRecord struct {
-	ID             uint                  `json:"id"`
-	CreatedAt      uint64                `json:"created_at"`
-	Address        string                `json:"address"`
-	BenefitAddress string                `json:"benefit_address"`
-	Amount         string                `json:"amount"`
-	Network        string                `json:"network"`
-	Status         models.WithdrawStatus `json:"status"`
-	TaskFeeEventID uint                  `json:"task_fee_event_id"`
-	WithdrawalFee  string                `json:"withdrawal_fee"`
+	ID                  uint                  `json:"id"`
+	CreatedAt           uint64                `json:"created_at"`
+	Address             string                `json:"address"`
+	BenefitAddress      string                `json:"benefit_address"`
+	Amount              string                `json:"amount"`
+	Network             string                `json:"network"`
+	Status              models.WithdrawStatus `json:"status"`
+	RelayAccountEventID uint                  `json:"relay_account_event_id"`
+	WithdrawalFee       string                `json:"withdrawal_fee"`
 }
 
 type GetWithdrawRequestsResponse struct {
@@ -48,7 +48,7 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 		return nil, validationErr
 	}
 
-	if address != config.GetConfig().Withdraw.Address {
+	if address != config.GetConfig().Withdraw.RelayWalletAddress {
 		validationErr := response.NewValidationErrorResponse("address", "Invalid address")
 		return nil, validationErr
 	}
@@ -78,15 +78,15 @@ func GetWithdrawRequests(c *gin.Context, in *GetWithdrawRequestsInputWithSignatu
 					continue
 				}
 				results = append(results, WithdrawRecord{
-					ID:             record.ID,
-					CreatedAt:      uint64(record.CreatedAt.Unix()),
-					Address:        record.Address,
-					BenefitAddress: record.BenefitAddress,
-					Amount:         record.Amount.String(),
-					Network:        record.Network,
-					Status:         record.Status,
-					TaskFeeEventID: record.TaskFeeEventID,
-					WithdrawalFee:  record.WithdrawalFee.String(),
+					ID:                  record.ID,
+					CreatedAt:           uint64(record.CreatedAt.Unix()),
+					Address:             record.Address,
+					BenefitAddress:      record.BenefitAddress,
+					Amount:              record.Amount.String(),
+					Network:             record.Network,
+					Status:              record.Status,
+					RelayAccountEventID: record.RelayAccountEventID,
+					WithdrawalFee:       record.WithdrawalFee.String(),
 				})
 			}
 		}

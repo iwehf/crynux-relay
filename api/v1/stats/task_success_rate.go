@@ -4,7 +4,7 @@ import (
 	"crynux_relay/api/v1/response"
 	"crynux_relay/config"
 	"crynux_relay/models"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,22 +25,23 @@ type GetTaskSuccessRateLineChartOutput struct {
 	Data *GetTaskSuccessRateLineChartData `json:"data"`
 }
 
-func GetTaskSuccessRateLineChart(_ *gin.Context, input *GetTaskCountLineChartParams) (*GetTaskSuccessRateLineChartOutput, error) {
+func GetTaskSuccessRateLineChart(_ *gin.Context, input *GetTaskSuccessRateLineChartParams) (*GetTaskSuccessRateLineChartOutput, error) {
 	timestampSuccessCount := make(map[int64]int64)
 	timestampTotalCount := make(map[int64]int64)
 
 	now := time.Now().UTC()
 	var start, end time.Time
 	var duration time.Duration
-	if input.Period == UnitHour {
+	switch input.Period {
+	case UnitHour:
 		duration = time.Hour
 		start = now.Truncate(duration).Add(-24 * duration)
 		end = now.Truncate(duration)
-	} else if input.Period == UnitDay {
+	case UnitDay:
 		duration = 24 * time.Hour
 		start = now.Truncate(duration).Add(-15 * duration)
 		end = now.Truncate(duration)
-	} else {
+	default:
 		duration = 7 * 24 * time.Hour
 		start = now.Truncate(duration).Add(-8 * duration)
 		end = now.Truncate(duration)
@@ -48,9 +49,10 @@ func GetTaskSuccessRateLineChart(_ *gin.Context, input *GetTaskCountLineChartPar
 
 	var allTaskCounts []models.TaskCount
 	stmt := config.GetDB().Model(&models.TaskCount{}).Where("start >= ?", start).Where("start < ?", end)
-	if input.TaskType == ImageTaskType {
-		stmt = stmt.Where("task_type = ?", models.TaskTypeSD)
-	} else if input.TaskType == TextTaskType {
+	switch input.TaskType {
+	case ImageTaskType:
+		stmt = stmt.Where("task_type IN ?", []models.TaskType{models.TaskTypeSD, models.TaskTypeSDFTLora})
+	case TextTaskType:
 		stmt = stmt.Where("task_type = ?", models.TaskTypeLLM)
 	}
 	stmt = stmt.Order("id")
@@ -80,9 +82,7 @@ func GetTaskSuccessRateLineChart(_ *gin.Context, input *GetTaskCountLineChartPar
 		timestamps = append(timestamps, timestamp)
 	}
 
-	sort.Slice(timestamps, func(i, j int) bool {
-		return timestamps[i] < timestamps[j]
-	})
+	slices.Sort(timestamps)
 
 	successRates := make([]float64, 0)
 	for _, timestamp := range timestamps {
