@@ -40,7 +40,7 @@ Relay MUST reuse historical `task_fee_events` by table rename to `relay_account_
 
 ## Relay Wallet Event Application Contract
 
-Relay Wallet synchronization MUST fetch relay account events as a contiguous ID stream and MUST preserve checkpoint continuity for every received ID.
+Relay Wallet synchronization MUST fetch relay account events from `GET /v1/relay_account/event_logs` as a contiguous ID stream and MUST preserve checkpoint continuity for every received ID.
 
 Relay Wallet balance application contract SHALL be:
 
@@ -52,6 +52,8 @@ Relay Wallet balance application contract SHALL be:
 - apply `TaskRefund`
 - skip `Withdraw`
 - skip `WithdrawRefund`
+
+Relay event log rows include a `payload` field as a JSON-encoded string. For `Deposit`, payload encodes `tx_hash` and `network`. For non-deposit event types, payload is `{}`.
 
 For skipped event types, Relay Wallet MUST still verify integrity and MUST still advance checkpoint to keep event-order alignment with withdrawal synchronization watermark.
 

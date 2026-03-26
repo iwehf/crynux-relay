@@ -57,7 +57,10 @@ func GetDepositRecords(c *gin.Context, in *GetDepositRecordsInput) (*GetDepositR
 
 	db := config.GetDB()
 
-	dbi := db.WithContext(dbCtx).Model(&models.DepositRecord{}).Where("address = ?", address)
+	dbi := db.WithContext(dbCtx).
+		Model(&models.DepositRecord{}).
+		Where("address = ?", address).
+		Where("local_status = ?", models.DepositLocalStatusProcessed)
 
 	if in.Network != nil {
 		dbi = dbi.Where("network = ?", *in.Network)

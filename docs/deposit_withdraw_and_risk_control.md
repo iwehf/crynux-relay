@@ -51,9 +51,12 @@ Relay MUST:
 
 1. Detect successful native transfers to the configured deposit address.
 2. Enforce idempotency per transaction hash and network.
-3. Create a `relay_account_events` record of type `Deposit`.
-4. Create a `deposit_records` record for client query.
-5. Increase the sender relay account balance.
+3. Create a `relay_account_events` record of type `Deposit` with reason format `3-{tx_hash}-{network}`.
+4. Create a `deposit_records` record for client query with `local_status = Pending`, and store the linked relay account event ID in `deposit_records.relay_account_event_id`.
+5. Apply the sender balance delta to in-memory cache in the business path and rely on background event projection to persist final balance in `relay_accounts`.
+6. Update `deposit_records.local_status` to `Processed` or `Invalid` when background event projection finalizes the linked deposit event.
+
+Client deposit-list API MUST return only rows with `deposit_records.local_status = Processed`.
 
 ## Task Charge, Refund and Income
 
@@ -154,7 +157,7 @@ This design solves three different requirements at the same time:
 
 Relay Wallet MUST synchronize in event-order:
 
-1. Sync `relay_account_events` in ascending ID order.
+1. Sync `relay_account_events` in ascending ID order through `GET /v1/relay_account/event_logs`.
 2. Verify signatures and integrity constraints before apply.
 3. Apply each event to local account table using event type balance effect.
 4. Sync withdrawal records and only execute records whose `relay_account_event_id` is not greater than the last applied relay account event ID.
@@ -164,6 +167,8 @@ Relay Wallet MUST reject or halt on ordering or integrity violations.
 Relay account events MUST be retained as a complete ledger for audit, including `Withdraw` and `WithdrawRefund` events.
 
 Relay Wallet should skip applying `Withdraw` and `WithdrawRefund` to its local balance if withdrawal deduction and rollback are handled by withdrawal processing flow.
+
+Relay event logs MUST include a `payload` field as a JSON-encoded string. For `Deposit` events, `payload` MUST encode `tx_hash` and `network` derived from event reason. For non-deposit events, `payload` MUST be `{}`.
 
 When Relay Wallet skips applying an event type, it MUST still:
 
@@ -219,6 +224,8 @@ When Relay Wallet skips applying an event type, it MUST still:
 | `amount` | BigInt | Deposit amount |
 | `network` | string | Source network |
 | `tx_hash` | string | Deposit transaction hash |
+| `relay_account_event_id` | uint | Ledger ordering anchor |
+| `local_status` | enum | `Pending`, `Processed`, `Invalid` |
 
 ## Configuration
 
@@ -252,7 +259,7 @@ When Relay Wallet skips applying an event type, it MUST still:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/v1/relay_account/logs` | Query relay account events |
+| `GET` | `/v1/relay_account/event_logs` | Query relay account events |
 | `GET` | `/v1/withdraw/list` | Query pending withdrawals |
 | `POST` | `/v1/withdraw/:id/fulfill` | Mark fulfilled |
 | `POST` | `/v1/withdraw/:id/reject` | Mark rejected |

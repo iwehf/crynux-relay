@@ -32,6 +32,22 @@ var relayAccountCache = &relayAccountCacheType{
 	accounts: make(map[string]*big.Int),
 }
 
+func splitRelayAccountEventReason(eventType models.RelayAccountEventType, reason string) ([]string, bool) {
+	eventTypeStr := fmt.Sprintf("%d", eventType)
+	if eventType == models.RelayAccountEventTypeDeposit {
+		parts := strings.SplitN(reason, "-", 3)
+		if len(parts) != 3 || parts[0] != eventTypeStr {
+			return nil, false
+		}
+		return parts, true
+	}
+	parts := strings.SplitN(reason, "-", 2)
+	if len(parts) != 2 || parts[0] != eventTypeStr {
+		return nil, false
+	}
+	return parts, true
+}
+
 func InitRelayAccountCache(ctx context.Context, db *gorm.DB) error {
 	for {
 		events, err := getPendingRelayAccountEvents(ctx, db, 50)
@@ -85,38 +101,23 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 	taskIDSet := make(map[string]struct{})
 	withdrawIDSet := make(map[uint]struct{})
 	balanceAddressSet := make(map[string]struct{})
-	txHashes := make([]string, 0)
-	networks := make([]string, 0)
+	depositReasonByEventID := make(map[uint][2]string)
 
 	for _, event := range events {
-		reasons := strings.Split(event.Reason, "-")
-		eventTypeStr := fmt.Sprintf("%d", event.Type)
-		if len(reasons) < 2 || reasons[0] != eventTypeStr {
+		reasons, ok := splitRelayAccountEventReason(event.Type, event.Reason)
+		if !ok {
 			invalidEvents = append(invalidEvents, event)
 			continue
 		}
 		switch event.Type {
 		case models.RelayAccountEventTypeDeposit:
-			if len(reasons) != 3 {
-				invalidEvents = append(invalidEvents, event)
-				continue
-			}
-			txHashes = append(txHashes, reasons[1])
-			networks = append(networks, reasons[2])
+			depositReasonByEventID[event.ID] = [2]string{reasons[1], reasons[2]}
 		case models.RelayAccountEventTypeTaskPayment, models.RelayAccountEventTypeTaskIncome, models.RelayAccountEventTypeDaoTaskShare, models.RelayAccountEventTypeTaskRefund:
-			if len(reasons) != 2 {
-				invalidEvents = append(invalidEvents, event)
-				continue
-			}
 			taskIDSet[reasons[1]] = struct{}{}
 			if event.Type == models.RelayAccountEventTypeTaskPayment {
 				balanceAddressSet[event.Address] = struct{}{}
 			}
 		case models.RelayAccountEventTypeWithdraw, models.RelayAccountEventTypeWithdrawRefund, models.RelayAccountEventTypeWithdrawFeeIncome:
-			if len(reasons) != 2 {
-				invalidEvents = append(invalidEvents, event)
-				continue
-			}
 			withdrawID, err := strconv.ParseUint(reasons[1], 10, 64)
 			if err != nil {
 				invalidEvents = append(invalidEvents, event)
@@ -194,9 +195,19 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 		relayBalanceMap[account.Address] = new(big.Int).Set(&account.Balance.Int)
 	}
 
-	validTxHashes := make(map[string]struct{})
-	for i, txHash := range txHashes {
-		network := networks[i]
+	type depositTxData struct {
+		FromAddress string
+		Amount      *big.Int
+	}
+	validDepositTxs := make(map[string]depositTxData)
+	appConfig := config.GetConfig()
+	for _, depositReason := range depositReasonByEventID {
+		txHash := depositReason[0]
+		network := depositReason[1]
+		key := fmt.Sprintf("%s-%s", network, txHash)
+		if _, exists := validDepositTxs[key]; exists {
+			continue
+		}
 		client, err := blockchain.GetBlockchainClient(network)
 		if err != nil {
 			return nil, nil, err
@@ -211,23 +222,46 @@ func validatePendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events 
 		if receipt.Status != types.ReceiptStatusSuccessful {
 			continue
 		}
-		validTxHashes[txHash] = struct{}{}
+		tx, _, err := client.RpcClient.TransactionByHash(ctx, common.HexToHash(txHash))
+		if errors.Is(err, ethereum.NotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if tx.To() == nil || !strings.EqualFold(tx.To().Hex(), appConfig.RelayAccount.DepositAddress) {
+			continue
+		}
+		from, err := types.Sender(types.LatestSignerForChainID(client.ChainID), tx)
+		if err != nil {
+			continue
+		}
+		validDepositTxs[key] = depositTxData{
+			FromAddress: from.Hex(),
+			Amount:      tx.Value(),
+		}
 	}
 
 	validEvents := make([]models.RelayAccountEvent, 0, len(candidateEvents))
 	for _, event := range candidateEvents {
-		reasons := strings.Split(event.Reason, "-")
+		reasons, ok := splitRelayAccountEventReason(event.Type, event.Reason)
+		if !ok {
+			invalidEvents = append(invalidEvents, event)
+			continue
+		}
 		switch event.Type {
 		case models.RelayAccountEventTypeDeposit:
-			if _, ok := validTxHashes[reasons[1]]; ok {
-				balance := relayBalanceMap[event.Address]
-				if balance != nil {
-					balance.Add(balance, &event.Amount.Int)
-				}
-				validEvents = append(validEvents, event)
-			} else {
+			key := fmt.Sprintf("%s-%s", reasons[2], reasons[1])
+			depositTx, ok := validDepositTxs[key]
+			if !ok || !strings.EqualFold(depositTx.FromAddress, event.Address) || depositTx.Amount.Cmp(&event.Amount.Int) != 0 {
 				invalidEvents = append(invalidEvents, event)
+				continue
 			}
+			balance := relayBalanceMap[event.Address]
+			if balance != nil {
+				balance.Add(balance, &event.Amount.Int)
+			}
+			validEvents = append(validEvents, event)
 		case models.RelayAccountEventTypeTaskPayment:
 			task, ok := taskMap[reasons[1]]
 			if !ok || event.Amount.Int.Cmp(&task.TaskFee.Int) != 0 {
@@ -331,10 +365,14 @@ func processPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events [
 	if len(invalidEvents) > 0 {
 		invalidIDs := make([]uint, 0, len(invalidEvents))
 		invalidWithdrawEventIDs := make([]uint, 0)
+		invalidDepositEventIDs := make([]uint, 0)
 		for _, event := range invalidEvents {
 			invalidIDs = append(invalidIDs, event.ID)
 			if event.Type == models.RelayAccountEventTypeWithdraw {
 				invalidWithdrawEventIDs = append(invalidWithdrawEventIDs, event.ID)
+			}
+			if event.Type == models.RelayAccountEventTypeDeposit {
+				invalidDepositEventIDs = append(invalidDepositEventIDs, event.ID)
 			}
 		}
 		if err := dbWithCtx.Model(&models.RelayAccountEvent{}).
@@ -347,6 +385,14 @@ func processPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events [
 				Where("relay_account_event_id IN (?)", invalidWithdrawEventIDs).
 				Where("local_status = ?", models.WithdrawLocalStatusPending).
 				Update("local_status", models.WithdrawLocalStatusInvalid).Error; err != nil {
+				return err
+			}
+		}
+		if len(invalidDepositEventIDs) > 0 {
+			if err := dbWithCtx.Model(&models.DepositRecord{}).
+				Where("relay_account_event_id IN (?)", invalidDepositEventIDs).
+				Where("local_status = ?", models.DepositLocalStatusPending).
+				Update("local_status", models.DepositLocalStatusInvalid).Error; err != nil {
 				return err
 			}
 		}
@@ -464,6 +510,21 @@ func processPendingRelayAccountEvents(ctx context.Context, db *gorm.DB, events [
 			}
 		}
 
+		depositEventIDs := make([]uint, 0)
+		for _, event := range validEvents {
+			if event.Type == models.RelayAccountEventTypeDeposit {
+				depositEventIDs = append(depositEventIDs, event.ID)
+			}
+		}
+		if len(depositEventIDs) > 0 {
+			if err := tx.Model(&models.DepositRecord{}).
+				Where("relay_account_event_id IN (?)", depositEventIDs).
+				Where("local_status = ?", models.DepositLocalStatusPending).
+				Update("local_status", models.DepositLocalStatusProcessed).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
@@ -526,17 +587,26 @@ func getRelayAccountFromCache(ctx context.Context, db *gorm.DB, address string) 
 	return relayAccountCache.accounts[address], nil
 }
 
-func createRelayAccountEvent(ctx context.Context, db *gorm.DB, eventType models.RelayAccountEventType, reason, address string, amount *big.Int) error {
+func createRelayAccountEventWithID(ctx context.Context, db *gorm.DB, eventType models.RelayAccountEventType, reason, address string, amount *big.Int) (uint, error) {
 	dbCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	return db.WithContext(dbCtx).Create(&models.RelayAccountEvent{
+	event := &models.RelayAccountEvent{
 		Reason:    reason,
 		Address:   address,
 		Amount:    models.BigInt{Int: *new(big.Int).Set(amount)},
 		CreatedAt: time.Now(),
 		Status:    models.RelayAccountEventStatusPending,
 		Type:      eventType,
-	}).Error
+	}
+	if err := db.WithContext(dbCtx).Create(event).Error; err != nil {
+		return 0, err
+	}
+	return event.ID, nil
+}
+
+func createRelayAccountEvent(ctx context.Context, db *gorm.DB, eventType models.RelayAccountEventType, reason, address string, amount *big.Int) error {
+	_, err := createRelayAccountEventWithID(ctx, db, eventType, reason, address, amount)
+	return err
 }
 
 func depositRelayAccount(ctx context.Context, db *gorm.DB, txHash, address string, amount *big.Int, network string) (func() error, error) {
@@ -545,14 +615,17 @@ func depositRelayAccount(ctx context.Context, db *gorm.DB, txHash, address strin
 
 	if err := db.WithContext(dbCtx).Transaction(func(tx *gorm.DB) error {
 		reason := fmt.Sprintf("%d-%s-%s", models.RelayAccountEventTypeDeposit, txHash, network)
-		if err := createRelayAccountEvent(ctx, tx, models.RelayAccountEventTypeDeposit, reason, address, amount); err != nil {
+		eventID, err := createRelayAccountEventWithID(ctx, tx, models.RelayAccountEventTypeDeposit, reason, address, amount)
+		if err != nil {
 			return err
 		}
 		record := &models.DepositRecord{
-			Address: address,
-			Amount:  models.BigInt{Int: *new(big.Int).Set(amount)},
-			Network: network,
-			TxHash:  txHash,
+			Address:             address,
+			Amount:              models.BigInt{Int: *new(big.Int).Set(amount)},
+			Network:             network,
+			TxHash:              txHash,
+			RelayAccountEventID: eventID,
+			LocalStatus:         models.DepositLocalStatusPending,
 		}
 		if err := tx.Create(record).Error; err != nil {
 			return err

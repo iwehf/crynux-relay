@@ -2,7 +2,7 @@
 
 This document explains how Relay account balance changes are handled in the current Relay implementation, from event creation to in-memory balance updates and then to database projection.
 
-It covers both Task and Withdraw paths.
+It covers Task, Deposit, and Withdraw paths.
 
 ## High-Level Overview
 
@@ -55,7 +55,7 @@ Business operations call service methods that:
 2. return a cache mutation callback (`commitFunc`) that applies in-memory delta.
 3. execute that callback inside transaction business flow.
 
-Task and Withdraw both use this pattern.
+Task, Deposit, and Withdraw use this pattern.
 
 ### 2) Background Event Projection to DB
 
@@ -149,6 +149,19 @@ On reject:
 4. apply in-memory cache refund to requester.
 5. background processor later projects `WithdrawRefund` into `relay_accounts`.
 
+## Deposit Path
+
+### Native Transfer Ingestion
+
+Deposit ingestion path:
+
+1. native token listener scans configured networks and finds successful transfers to `relay_account.deposit_address`.
+2. Relay creates a `Deposit` event (`Pending`) with reason format `3-{tx_hash}-{network}`.
+3. Relay creates one `deposit_records` row with `local_status = Pending` and stores the created event ID into `deposit_records.relay_account_event_id`.
+4. Relay applies in-memory cache increase via callback.
+5. transaction completes.
+6. background processor validates tx evidence, projects `Deposit` event into `relay_accounts`, and updates linked `deposit_records.local_status` to `Processed` or `Invalid`.
+
 ## Consistency Characteristics
 
 Current implementation characteristics are:
@@ -162,8 +175,10 @@ Current implementation characteristics are:
 
 - `service/relay_account.go`
 - `service/task_status.go`
+- `service/token_listener.go`
 - `service/withdraw.go`
 - `models/relay_account.go`
+- `models/deposit.go`
 - `models/withdraw.go`
-- `api/v1/task_fee/get_task_fee_logs.go`
+- `api/v1/relay_account/event_logs.go`
 - `api/v1/withdraw/list_withdraw_requests.go`

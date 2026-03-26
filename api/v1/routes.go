@@ -13,7 +13,6 @@ import (
 	"crynux_relay/api/v1/response"
 	"crynux_relay/api/v1/staking"
 	"crynux_relay/api/v1/stats"
-	taskfee "crynux_relay/api/v1/task_fee"
 	"crynux_relay/api/v1/time"
 	"crynux_relay/api/v1/withdraw"
 	"crynux_relay/api/v1/worker"
@@ -235,10 +234,10 @@ func InitRoutes(r *fizz.Fizz) {
 	}, tonic.Handler(incentive.GetNodeDailyIncentive, 200))
 
 	relayAccountGroup := v1g.Group("relay_account", "relay_account", "relay account related APIs")
-	relayAccountGroup.GET("/logs", []fizz.OperationOption{
-		fizz.Summary("Get relay account logs"),
+	relayAccountGroup.GET("/event_logs", []fizz.OperationOption{
+		fizz.Summary("Get relay account event logs"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
-	}, tonic.Handler(taskfee.GetRelayAccountLogs, 200))
+	}, tonic.Handler(relayaccount.GetRelayAccountEventLogs, 200))
 	relayAccountGroup.POST("/:address/withdraw", []fizz.OperationOption{
 		fizz.Summary("Create withdraw request"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),

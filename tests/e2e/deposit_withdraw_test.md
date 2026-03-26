@@ -15,9 +15,11 @@ This document defines the execution flow for validating deposit and withdraw acr
 ### 1. Build e2e container images
 
 - Build Relay e2e image from the Relay repository.
-- Build Relay Wallet e2e image from the Relay Wallet repository.
+- After this succeeds, build the Relay Wallet e2e image from the Relay Wallet repository.
 - Confirm both images are available for compose startup.
 - DO NOT reuse existing images. Always rebuild the image before starting the container.
+- Docker build cache CAN be used during rebuild. Do not add the `--no-cache` flag.
+- DO NOT continue if the build is not completed, or failed. If building takes too long, simply stop and report error.
 
 ### 2. Prepare mount folders and base config files
 
@@ -56,7 +58,7 @@ This document defines the execution flow for validating deposit and withdraw acr
 | `relay_wallet_relay_api` | private key | Relay Wallet authentication key for Relay withdraw APIs | Relay Wallet `relay.api.private_key_file` MUST point to the file storing this key. Relay `withdraw.relay_wallet_address` MUST equal the address derived from this key. | `0` |
 | `relay_credits_api_auth` | private key | Relay credits API authorization signer key | Relay `credits.api_auth_address` MUST equal the address derived from this key. | `0` |
 | `client_e2e_user` | private key | Client account key for connect-wallet authentication, withdraw request signing, deposit transfer, and deposit record ownership checks | This key MUST be used by the e2e client actor for authenticated API calls and MUST be used as the sender in the deposit transaction of this scenario. | `60` (deposit `5` per run x `10` + gas reserve `10`) |
-| `relay_account.deposit_address` | address | Deposit target address | Relay `relay_account.deposit_address` MUST be set to this address. | `0` |
+| `relay_account.deposit_address` | address | Deposit target address | Relay `relay_account.deposit_address` MUST be set to this address. Relay Wallet `relay.deposit_address` MUST be set to this address for independent deposit verification. | `0` |
 | `withdraw.withdrawal_fee_address` | address | Withdrawal fee receiver address | Relay `withdraw.withdrawal_fee_address` MUST be set to this address. | `0` |
 | `dao.task_fee_share_address` | address | DAO task fee share receiver address | Relay `dao.task_fee_share_address` MUST be set to this address. | `0` |
 
