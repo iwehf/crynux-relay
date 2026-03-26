@@ -15,9 +15,11 @@ This document defines the execution flow for validating deposit and withdraw acr
 ### 1. Build e2e container images
 
 - Build Relay e2e image from the Relay repository.
-- Build Relay Wallet e2e image from the Relay Wallet repository.
+- After this succeeds, build the Relay Wallet e2e image from the Relay Wallet repository.
 - Confirm both images are available for compose startup.
 - DO NOT reuse existing images. Always rebuild the image before starting the container.
+- Docker build cache CAN be used during rebuild. Do not add the `--no-cache` flag.
+- DO NOT continue if the build is not completed, or failed. If building takes too long, simply stop and report error.
 
 ### 2. Prepare mount folders and base config files
 
