@@ -177,12 +177,21 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 
 	// QoS-based permanent kickout check
 	if ShouldPermanentKickout(node) {
-		return db.Transaction(func(tx *gorm.DB) error {
-			if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
+		task, err := models.GetTaskByIDCommitment(ctx, db, taskIDCommitment)
+		if err != nil {
+			return err
+		}
+		healthMetrics := calculateCurrentNodeHealthMetrics(node)
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := SetNodeStatusQuit(ctx, tx, node, false); err != nil {
 				return err
 			}
-			return emitEvent(ctx, db, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
-		})
+			return emitEvent(ctx, tx, &models.NodeKickedOutEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
+		}); err != nil {
+			return err
+		}
+		logNodeKickoutHealthEvent(node, task, healthMetrics)
+		return nil
 	}
 
 	switch node.Status {
@@ -223,7 +232,11 @@ func updateNodeQosScore(ctx context.Context, db *gorm.DB, node *models.Node, qos
 	if err != nil {
 		return err
 	}
-	return node.Update(ctx, db, map[string]interface{}{
+	if err := node.Update(ctx, db, map[string]interface{}{
 		"qos_score": qosScore,
-	})
+	}); err != nil {
+		return err
+	}
+	node.QOSScore = qosScore
+	return nil
 }

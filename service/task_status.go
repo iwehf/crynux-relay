@@ -238,6 +238,8 @@ func SetTaskStatusGroupValidated(ctx context.Context, db *gorm.DB, originTask *m
 		return err
 	}
 
+	healthBoostMetrics := nodeHealthMetrics{}
+	logHealthBoost := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err = task.Update(ctx, tx, map[string]interface{}{
 			"status":         models.TaskGroupValidated,
@@ -252,6 +254,8 @@ func SetTaskStatusGroupValidated(ctx context.Context, db *gorm.DB, originTask *m
 			}
 		}
 
+		healthBoostMetrics = calculateBoostNodeHealthMetrics(node)
+		logHealthBoost = shouldLogHealthBoost(healthBoostMetrics)
 		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
 			return err
 		}
@@ -259,6 +263,9 @@ func SetTaskStatusGroupValidated(ctx context.Context, db *gorm.DB, originTask *m
 		return emitEvent(ctx, tx, &models.TaskValidatedEvent{TaskIDCommitment: task.TaskIDCommitment, SelectedNode: task.SelectedNode})
 	}); err != nil {
 		return err
+	}
+	if logHealthBoost {
+		logHealthBoostNodeHealthEvent(node, &task, healthBoostMetrics)
 	}
 	*originTask = task
 	return nil
@@ -304,6 +311,8 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		return err
 	}
 
+	healthBoostMetrics := nodeHealthMetrics{}
+	logHealthBoost := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		commitFunc, err := refundTaskPaymentToRelayAccount(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
@@ -323,6 +332,8 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		if err != nil {
 			return err
 		}
+		healthBoostMetrics = calculateBoostNodeHealthMetrics(node)
+		logHealthBoost = shouldLogHealthBoost(healthBoostMetrics)
 		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
 			return err
 		}
@@ -339,6 +350,9 @@ func SetTaskStatusEndGroupRefund(ctx context.Context, db *gorm.DB, originTask *m
 		return nil
 	}); err != nil {
 		return err
+	}
+	if logHealthBoost {
+		logHealthBoostNodeHealthEvent(node, &task, healthBoostMetrics)
 	}
 	*originTask = task
 	return nil
@@ -360,6 +374,9 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 		"validated_time": task.ValidatedTime,
 		"qos_score":      task.QOSScore,
 	}
+	timeoutPenaltyMetrics := nodeHealthMetrics{}
+	logTimeoutPenalty := false
+	var timeoutPenaltyNode *models.Node
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		commitFunc, err := refundTaskPaymentToRelayAccount(ctx, tx, task.TaskIDCommitment, task.Creator, &task.TaskFee.Int)
 		if err != nil {
@@ -384,9 +401,12 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 				}
 				// Apply health penalty on timeout when the node never submitted a result
 				if task.AbortReason == models.TaskAbortTimeout && !task.ScoreReadyTime.Valid {
+					timeoutPenaltyMetrics = calculatePenaltyNodeHealthMetrics(node)
 					if err := ApplyHealthPenalty(ctx, tx, node); err != nil {
 						return err
 					}
+					timeoutPenaltyNode = node
+					logTimeoutPenalty = true
 				}
 				if err := nodeFinishTask(ctx, tx, node); err != nil {
 					return err
@@ -409,6 +429,9 @@ func SetTaskStatusEndAborted(ctx context.Context, db *gorm.DB, originTask *model
 		return nil
 	}); err != nil {
 		return err
+	}
+	if logTimeoutPenalty && timeoutPenaltyNode != nil {
+		logTaskTimeoutNodeHealthEvent(timeoutPenaltyNode, &task, timeoutPenaltyMetrics)
 	}
 	*originTask = task
 	return nil
@@ -467,6 +490,8 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 		})
 	}
 
+	healthBoostMetrics := nodeHealthMetrics{}
+	logHealthBoost := false
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		var commitFuncs []func() error
 		for _, payment := range payments {
@@ -485,6 +510,8 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 			return err
 		}
 
+		healthBoostMetrics = calculateBoostNodeHealthMetrics(node)
+		logHealthBoost = shouldLogHealthBoost(healthBoostMetrics)
 		if err := ApplyHealthBoost(ctx, tx, node); err != nil {
 			return err
 		}
@@ -509,6 +536,9 @@ func SetTaskStatusEndSuccess(ctx context.Context, db *gorm.DB, originTask *model
 		return nil
 	}); err != nil {
 		return err
+	}
+	if logHealthBoost {
+		logHealthBoostNodeHealthEvent(node, &task, healthBoostMetrics)
 	}
 	*originTask = task
 	return nil
