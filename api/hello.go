@@ -1,8 +1,9 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func Hello(ctx *gin.Context) {
@@ -11,7 +12,7 @@ func Hello(ctx *gin.Context) {
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>Crynux Hydrogen(H) Network Relay</title>
+		<title>Crynux Relay</title>
 		<link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
 		<style>
 			* {
@@ -33,36 +34,36 @@ func Hello(ctx *gin.Context) {
 				margin-left: -400px;
 				margin-top: -200px;
 			}
-			
+
 			.title {
 				font-size: 34px;
 				font-weight: 600;
 				text-align: center;
 			}
-			
+
 			.link {
 				margin-top: 36px;
 				text-align: center;
 			}
-			
+
 			.link a {
 				text-decoration: none;
 				color: #333;
 			}
-			
+
 			.link a:hover {
 				text-decoration: underline;
 				color: #09A9FD;
 			}
-			
+
 			.logo {
 				margin-top: 120px;
 			}
-			
+
 			.logo a {
 				text-decoration: none;
 			}
-			
+
 			.logo img {
 				display: block;
 				width: 200px;
@@ -74,18 +75,18 @@ func Hello(ctx *gin.Context) {
 	</head>
 	<body>
 		<div class="card">
-			<div class="title">Relay Server for the Crynux Hydrogen(H) Network</div>
+			<div class="title">Relay Server for the Crynux Network</div>
 			<div class="link">
 				<a href="/static/api_docs.html" target="_blank">API</a>
 				&nbsp;|&nbsp;
-				<a href="https://github.com/crynux-ai/h-relay" target="_blank">GitHub</a>
+				<a href="https://github.com/crynux-network/crynux-relay" target="_blank">GitHub</a>
 				&nbsp;|&nbsp;
-				<a href="https://docs.crynux.ai" target="_blank">Documentation</a>
+				<a href="https://docs.crynux.io" target="_blank">Documentation</a>
 				&nbsp;|&nbsp;
-				<a href="https://blog.crynux.ai" target="_blank">Blog</a>
+				<a href="https://blog.crynux.io" target="_blank">Blog</a>
 			</div>
 			<div class="logo">
-				<a href="https://crynux.ai" target="_blank">
+				<a href="https://crynux.io" target="_blank">
 					<img src="/static/crynux.png" />
 				</a>
 			</div>

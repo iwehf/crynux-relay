@@ -5,7 +5,12 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
+	"path/filepath"
 )
+
+const defaultNodeHealthLogPath = "data/logs/node_health.log"
+
+var nodeHealthLogger *logrus.Logger
 
 func InitLog(appConfig *AppConfig) error {
 
@@ -13,35 +18,13 @@ func InitLog(appConfig *AppConfig) error {
 
 	logrus.SetFormatter(&logrus.TextFormatter{})
 
-	if appConfig.Log.Output == "" || appConfig.Log.Output == "stderr" {
+	switch appConfig.Log.Output {
+	case "", "stderr":
 		logrus.SetOutput(os.Stderr)
-	} else if appConfig.Log.Output == "stdout" {
+	case "stdout":
 		logrus.SetOutput(os.Stdout)
-	} else {
-
-		logWriter := &lumberjack.Logger{
-			Filename: appConfig.Log.Output,
-			Compress: true,
-		}
-
-		if appConfig.Log.MaxFileSize == 0 {
-			logWriter.MaxSize = 500
-		} else {
-			logWriter.MaxSize = appConfig.Log.MaxFileSize
-		}
-
-		if appConfig.Log.MaxDays == 0 {
-			logWriter.MaxAge = 30
-		} else {
-			logWriter.MaxAge = appConfig.Log.MaxDays
-		}
-
-		if appConfig.Log.MaxFileNum == 0 {
-			logWriter.MaxBackups = 10
-		} else {
-			logWriter.MaxBackups = appConfig.Log.MaxFileNum
-		}
-
+	default:
+		logWriter := newLogWriter(appConfig.Log.Output, appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum)
 		mw := io.MultiWriter(os.Stdout, logWriter)
 		logrus.SetOutput(mw)
 	}
@@ -53,6 +36,52 @@ func InitLog(appConfig *AppConfig) error {
 	}
 
 	logrus.SetLevel(level)
+	initNodeHealthLogger(appConfig)
 
 	return nil
+}
+
+func GetNodeHealthLogger() *logrus.Logger {
+	return nodeHealthLogger
+}
+
+func initNodeHealthLogger(appConfig *AppConfig) {
+	nodeHealthLogger = logrus.New()
+	nodeHealthLogger.SetFormatter(&logrus.TextFormatter{})
+	nodeHealthLogger.SetLevel(logrus.InfoLevel)
+	nodeHealthLogger.SetOutput(newLogWriter(getNodeHealthLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
+}
+
+func getNodeHealthLogPath(mainLogOutput string) string {
+	if mainLogOutput == "" || mainLogOutput == "stdout" || mainLogOutput == "stderr" {
+		return defaultNodeHealthLogPath
+	}
+	return filepath.Join(filepath.Dir(mainLogOutput), "node_health.log")
+}
+
+func newLogWriter(filename string, maxFileSize, maxDays, maxFileNum int) *lumberjack.Logger {
+	logWriter := &lumberjack.Logger{
+		Filename: filename,
+		Compress: true,
+	}
+
+	if maxFileSize == 0 {
+		logWriter.MaxSize = 500
+	} else {
+		logWriter.MaxSize = maxFileSize
+	}
+
+	if maxDays == 0 {
+		logWriter.MaxAge = 30
+	} else {
+		logWriter.MaxAge = maxDays
+	}
+
+	if maxFileNum == 0 {
+		logWriter.MaxBackups = 10
+	} else {
+		logWriter.MaxBackups = maxFileNum
+	}
+
+	return logWriter
 }
