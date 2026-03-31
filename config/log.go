@@ -55,7 +55,7 @@ func GetTaskAssignmentLogger() *logrus.Logger {
 }
 
 func initNodeHealthLogger(appConfig *AppConfig) {
-	if !isNodeHealthLogEnabled(appConfig) {
+	if !appConfig.Log.Features.NodeHealthEnabled {
 		nodeHealthLogger = nil
 		return
 	}
@@ -74,13 +74,6 @@ func initTaskAssignmentLogger(appConfig *AppConfig) {
 	taskAssignmentLogger.SetFormatter(&logrus.TextFormatter{})
 	taskAssignmentLogger.SetLevel(logrus.InfoLevel)
 	taskAssignmentLogger.SetOutput(newLogWriter(getTaskAssignmentLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
-}
-
-func isNodeHealthLogEnabled(appConfig *AppConfig) bool {
-	if appConfig.Log.Features.NodeHealthEnabled == nil {
-		return false
-	}
-	return *appConfig.Log.Features.NodeHealthEnabled
 }
 
 func getNodeHealthLogPath(mainLogOutput string) string {

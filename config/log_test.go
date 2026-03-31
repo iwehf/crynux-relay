@@ -52,9 +52,8 @@ func TestInitNodeHealthLogger_DefaultDisabled(t *testing.T) {
 func TestInitNodeHealthLogger_Disabled(t *testing.T) {
 	nodeHealthLogger = nil
 
-	enabled := false
 	cfg := &AppConfig{}
-	cfg.Log.Features.NodeHealthEnabled = &enabled
+	cfg.Log.Features.NodeHealthEnabled = false
 
 	initNodeHealthLogger(cfg)
 
@@ -66,9 +65,8 @@ func TestInitNodeHealthLogger_Disabled(t *testing.T) {
 func TestInitNodeHealthLogger_Enabled(t *testing.T) {
 	nodeHealthLogger = nil
 
-	enabled := true
 	cfg := &AppConfig{}
-	cfg.Log.Features.NodeHealthEnabled = &enabled
+	cfg.Log.Features.NodeHealthEnabled = true
 
 	initNodeHealthLogger(cfg)
 
