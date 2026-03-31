@@ -5,7 +5,6 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/models"
 	"fmt"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -25,11 +24,10 @@ func logTaskAssignmentEvent(ctx context.Context, task *models.InferenceTask, nod
 	}
 
 	logger.Infof(
-		"[TaskAssignment] [%s] [%s] [%d] [%s] [%s] task_id=%s",
+		"[TaskAssignment] [%s] [%s] [candidate_count=%d] [queue_size=%s] task_id=%s",
 		taskTypeTag(task.TaskType),
 		taskVramRequirementLabel(task),
 		len(nodes),
-		taskAssignmentNodesLabel(nodes),
 		queueSizeLabel,
 		task.TaskIDCommitment,
 	)
@@ -40,16 +38,4 @@ func taskVramRequirementLabel(task *models.InferenceTask) string {
 		return fmt.Sprintf("%dGB", task.RequiredGPUVRAM)
 	}
 	return fmt.Sprintf("%dGB", task.MinVRAM)
-}
-
-func taskAssignmentNodesLabel(nodes []models.Node) string {
-	if len(nodes) == 0 {
-		return "none"
-	}
-
-	addresses := make([]string, 0, len(nodes))
-	for _, node := range nodes {
-		addresses = append(addresses, node.Address)
-	}
-	return strings.Join(addresses, ",")
 }
