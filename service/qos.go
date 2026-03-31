@@ -109,7 +109,11 @@ func getEffectiveHealth(healthBase float64, healthUpdatedAt sql.NullTime) float6
 func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	cfg := config.GetConfig().QoS
 	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
-	hNew := hEffective * cfg.PenaltyFactor
+	penaltyFactor := cfg.PenaltyFactor
+	if hEffective >= cfg.FirstTimeoutHealthThreshold {
+		penaltyFactor = cfg.FirstTimeoutPenaltyFactor
+	}
+	hNew := hEffective * penaltyFactor
 
 	return node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,

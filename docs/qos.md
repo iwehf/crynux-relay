@@ -88,19 +88,27 @@ Each node carries a **health multiplier** `H` (range 0.0 to 1.0, default 1.0).
 
 #### Penalty on Timeout
 
-When a task assigned to the node ends with a timeout, the health multiplier is penalized:
+When a task assigned to the node ends with a timeout, the health multiplier is penalized by a two-stage rule based on current effective health:
 
 ```
-H_new = H_effective * PenaltyFactor
+if H_effective >= FirstTimeoutHealthThreshold:
+    H_new = H_effective * FirstTimeoutPenaltyFactor
+else:
+    H_new = H_effective * PenaltyFactor
 ```
 
-Where `PenaltyFactor = 0.3`.
-- 1 timeout: H drops to 0.30 (70% reduction in QoS score)
-- 2 consecutive timeouts: H drops to 0.09 (effectively excluded)
+With default config values:
+- `FirstTimeoutPenaltyFactor = 0.95`
+- `FirstTimeoutHealthThreshold = 0.99`
+- `PenaltyFactor = 0.3` (heavy penalty for repeated timeout state)
+
+Default behavior example:
+- 1 timeout from full health: `1.00 -> 0.95` (light penalty)
+- 2nd consecutive timeout: `0.95 -> 0.285` (heavy penalty begins)
 
 #### Hard Exclusion
 
-When a node's health drops below the **exclusion threshold** (`0.1`), its final QoS score is forced to **0**. The node is effectively excluded from receiving tasks until it recovers.
+When a node's health drops below the **exclusion threshold** (`0.1`), its final QoS score is forced to **0**. The node is effectively excluded from receiving tasks until it recovers. Under default penalty settings, this occurs after the heavy-penalty stage drives health below the threshold.
 
 #### Recovery
 
@@ -119,7 +127,9 @@ The penalty is temporary. Health recovers via two mechanisms:
 | `TASK_SCORE_REWARDS` | [10, 5, 2] | Task scores for 1st, 2nd, 3rd place |
 | `maxQoSScore` | 10.0 | Fixed normalization denominator for QoS score |
 | `qos.score_pool_size` | 50 | Rolling pool size for node QoS calculation |
-| `qos.penalty_factor` | 0.3 | Multiplier applied to H on timeout |
+| `qos.penalty_factor` | 0.3 | Heavy timeout multiplier applied to H after first-timeout condition is no longer met |
+| `qos.first_timeout_penalty_factor` | 0.95 | Light timeout multiplier applied when node health is near full |
+| `qos.first_timeout_health_threshold` | 0.99 | Health threshold that determines whether timeout uses light or heavy penalty |
 | `qos.success_boost` | 0.15 | Additive boost to H on success |
 | `qos.recovery_tau_minutes` | 30 | Time constant used for passive health recovery |
 | `qos.exclude_threshold` | 0.1 | H value below which QoS becomes 0 (excluded) |
