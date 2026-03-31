@@ -145,16 +145,23 @@ func CalculateQosScore(qosScore float64, healthBase float64, healthUpdatedAt sql
 	return qos
 }
 
+// CalculateLongTermQos returns normalized long-term QoS in range [0, 1].
+// If persisted long-term score is not initialized, use 0.5 as default.
+func CalculateLongTermQos(qosScore float64) float64 {
+	qosLong := qosScore / GetMaxQosScore()
+	if qosLong == 0 {
+		qosLong = 0.5
+	}
+	return qosLong
+}
+
 // CalculateQosComponents returns long-term QoS, short-term QoS and combined QoS.
 func CalculateQosComponents(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) (float64, float64, float64) {
 	h := getEffectiveHealth(healthBase, healthUpdatedAt)
 	cfg := config.GetConfig().QoS
+	qosLong := CalculateLongTermQos(qosScore)
 	if h < cfg.ExcludeThreshold {
-		return 0, h, 0 // hard exclusion
-	}
-	qosLong := qosScore / GetMaxQosScore()
-	if qosLong == 0 {
-		qosLong = 0.5 // default for new nodes
+		return qosLong, h, 0 // hard exclusion
 	}
 	return qosLong, h, qosLong * h
 }
