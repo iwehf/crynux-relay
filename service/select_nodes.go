@@ -154,6 +154,7 @@ func selectNodeForInferenceTask(ctx context.Context, task *models.InferenceTask)
 		}
 	}
 	if len(nodes) == 0 {
+		logTaskAssignmentEvent(ctx, task, nodes)
 		return nil, nil
 	}
 
@@ -198,6 +199,8 @@ func selectNodeForInferenceTask(ctx context.Context, task *models.InferenceTask)
 		nodes = changedNodes
 		scores = changedScores
 	}
+
+	logTaskAssignmentEvent(ctx, task, nodes)
 
 	node := selectNodesByScore(nodes, scores, 1)[0]
 	return &node, nil

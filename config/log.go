@@ -8,9 +8,13 @@ import (
 	"path/filepath"
 )
 
-const defaultNodeHealthLogPath = "data/logs/node_health.log"
+const (
+	defaultNodeHealthLogPath     = "data/logs/node_health.log"
+	defaultTaskAssignmentLogPath = "data/logs/task_assignment.log"
+)
 
 var nodeHealthLogger *logrus.Logger
+var taskAssignmentLogger *logrus.Logger
 
 func InitLog(appConfig *AppConfig) error {
 
@@ -37,6 +41,7 @@ func InitLog(appConfig *AppConfig) error {
 
 	logrus.SetLevel(level)
 	initNodeHealthLogger(appConfig)
+	initTaskAssignmentLogger(appConfig)
 
 	return nil
 }
@@ -45,11 +50,30 @@ func GetNodeHealthLogger() *logrus.Logger {
 	return nodeHealthLogger
 }
 
+func GetTaskAssignmentLogger() *logrus.Logger {
+	return taskAssignmentLogger
+}
+
 func initNodeHealthLogger(appConfig *AppConfig) {
+	if !appConfig.Log.Features.NodeHealthEnabled {
+		nodeHealthLogger = nil
+		return
+	}
 	nodeHealthLogger = logrus.New()
 	nodeHealthLogger.SetFormatter(&logrus.TextFormatter{})
 	nodeHealthLogger.SetLevel(logrus.InfoLevel)
 	nodeHealthLogger.SetOutput(newLogWriter(getNodeHealthLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
+}
+
+func initTaskAssignmentLogger(appConfig *AppConfig) {
+	if !appConfig.Log.Features.TaskAssignmentEnabled {
+		taskAssignmentLogger = nil
+		return
+	}
+	taskAssignmentLogger = logrus.New()
+	taskAssignmentLogger.SetFormatter(&logrus.TextFormatter{})
+	taskAssignmentLogger.SetLevel(logrus.InfoLevel)
+	taskAssignmentLogger.SetOutput(newLogWriter(getTaskAssignmentLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
 }
 
 func getNodeHealthLogPath(mainLogOutput string) string {
@@ -57,6 +81,13 @@ func getNodeHealthLogPath(mainLogOutput string) string {
 		return defaultNodeHealthLogPath
 	}
 	return filepath.Join(filepath.Dir(mainLogOutput), "node_health.log")
+}
+
+func getTaskAssignmentLogPath(mainLogOutput string) string {
+	if mainLogOutput == "" || mainLogOutput == "stdout" || mainLogOutput == "stderr" {
+		return defaultTaskAssignmentLogPath
+	}
+	return filepath.Join(filepath.Dir(mainLogOutput), "task_assignment.log")
 }
 
 func newLogWriter(filename string, maxFileSize, maxDays, maxFileNum int) *lumberjack.Logger {

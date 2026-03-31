@@ -27,6 +27,10 @@ type AppConfig struct {
 		MaxFileSize int    `mapstructure:"max_file_size"`
 		MaxDays     int    `mapstructure:"max_days"`
 		MaxFileNum  int    `mapstructure:"max_file_num"`
+		Features    struct {
+			NodeHealthEnabled     bool `mapstructure:"node_health_enabled"`
+			TaskAssignmentEnabled bool `mapstructure:"task_assignment_enabled"`
+		} `mapstructure:"features"`
 	} `mapstructure:"log"`
 
 	Http struct {

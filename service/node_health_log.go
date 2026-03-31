@@ -22,42 +22,37 @@ type nodeHealthMetrics struct {
 }
 
 func calculatePenaltyNodeHealthMetrics(node *models.Node) nodeHealthMetrics {
-	cfg := config.GetConfig().QoS
 	healthBefore := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
-	healthAfter := healthBefore * cfg.PenaltyFactor
-	longTermQos := calculateNodeLongTermQos(node.QOSScore)
+	healthAfter := calculatePenalizedHealth(healthBefore)
+	longTermQos := CalculateLongTermQos(node.QOSScore)
 
 	return nodeHealthMetrics{
 		HealthBefore: healthBefore,
 		HealthAfter:  healthAfter,
-		QosBefore:    calculateNodeQosFromHealth(longTermQos, healthBefore),
-		QosAfter:     calculateNodeQosFromHealth(longTermQos, healthAfter),
+		QosBefore:    calculateCombinedQos(longTermQos, healthBefore),
+		QosAfter:     calculateCombinedQos(longTermQos, healthAfter),
 		LongTermQos:  longTermQos,
 	}
 }
 
 func calculateBoostNodeHealthMetrics(node *models.Node) nodeHealthMetrics {
-	cfg := config.GetConfig().QoS
 	healthBefore := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
-	healthAfter := healthBefore + cfg.SuccessBoost
-	if healthAfter > 1.0 {
-		healthAfter = 1.0
-	}
-	longTermQos := calculateNodeLongTermQos(node.QOSScore)
+	healthAfter := calculateBoostedHealth(healthBefore)
+	longTermQos := CalculateLongTermQos(node.QOSScore)
 
 	return nodeHealthMetrics{
 		HealthBefore: healthBefore,
 		HealthAfter:  healthAfter,
-		QosBefore:    calculateNodeQosFromHealth(longTermQos, healthBefore),
-		QosAfter:     calculateNodeQosFromHealth(longTermQos, healthAfter),
+		QosBefore:    calculateCombinedQos(longTermQos, healthBefore),
+		QosAfter:     calculateCombinedQos(longTermQos, healthAfter),
 		LongTermQos:  longTermQos,
 	}
 }
 
 func calculateCurrentNodeHealthMetrics(node *models.Node) nodeHealthMetrics {
 	health := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
-	longTermQos := calculateNodeLongTermQos(node.QOSScore)
-	qos := calculateNodeQosFromHealth(longTermQos, health)
+	longTermQos := CalculateLongTermQos(node.QOSScore)
+	qos := calculateCombinedQos(longTermQos, health)
 
 	return nodeHealthMetrics{
 		HealthBefore: health,
@@ -133,19 +128,4 @@ func calculateNodeStakingScore(node *models.Node) float64 {
 		return 0
 	}
 	return CalculateStakingScore(&node.StakeAmount.Int, maxStaking)
-}
-
-func calculateNodeLongTermQos(qosScore float64) float64 {
-	qosLong := qosScore / globalMaxQosScore
-	if qosLong == 0 {
-		return 0.5
-	}
-	return qosLong
-}
-
-func calculateNodeQosFromHealth(longTermQos float64, health float64) float64 {
-	if health < config.GetConfig().QoS.ExcludeThreshold {
-		return 0
-	}
-	return longTermQos * health
 }

@@ -25,7 +25,7 @@ type exportNodeQosCSVRow struct {
 func ExportNodeQosCSV(c *gin.Context) {
 	var nodes []models.Node
 	if err := config.GetDB().Model(&models.Node{}).
-		Where("status != ?", models.NodeStatusQuit).
+		Where("status != ? AND status != ?", models.NodeStatusQuit, models.NodeStatusPaused).
 		Find(&nodes).Error; err != nil {
 		c.JSON(500, gin.H{
 			"message": err.Error(),
