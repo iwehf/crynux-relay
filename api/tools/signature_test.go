@@ -2,22 +2,34 @@ package tools_test
 
 import (
 	"crynux_relay/api/tools"
+	"crynux_relay/blockchain"
 	"testing"
+	"time"
 )
 
 func TestSignature(t *testing.T) {
-	
-	signature := "0x3076ab25f2a00baac115a8a8e44dd915c871a955e89899d5fd70a65af49e4100187cfc721489722cc552c25bc30ce7f7562aaa759500b0a7d1e5d51d31e10ff31b"
-	address := "0xbab3d0dfe3f631a8aca3c8e25633317a7d4c9dcb"
-	timestamp := int64(1756973246)
+	validator := tools.NewSignatureValidator(60)
+	privateKey := "4c0883a69102937d6231471b5dbb6204fe5129617082794b75bc6dc66f6cb6b2"
+	verifier := blockchain.NewSignatureVerifier()
 
-	message := tools.GenerateConnectWalletMessage(address, timestamp)
-	recoveredAddress, err := tools.ValidateAndRecover(message, signature, timestamp)
+	address, err := verifier.GetAddressFromPrivateKey(privateKey)
 	if err != nil {
-		t.Fatalf("Failed to validate signature: %v", err)
+		t.Fatalf("failed to derive address: %v", err)
+	}
+
+	timestamp := time.Now().Unix()
+	message := validator.GenerateConnectWalletMessage(address, timestamp)
+	signature, err := validator.GenerateTestSignature(message, privateKey)
+	if err != nil {
+		t.Fatalf("failed to sign message: %v", err)
+	}
+
+	recoveredAddress, err := validator.ValidateAndRecoverAddress(message, signature, timestamp)
+	if err != nil {
+		t.Fatalf("failed to validate signature: %v", err)
 	}
 	t.Logf("Recovered address: %s", recoveredAddress)
 	if recoveredAddress != address {
-		t.Fatalf("Recovered address does not match expected address")
+		t.Fatalf("recovered address does not match expected address")
 	}
 }

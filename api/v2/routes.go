@@ -1,7 +1,9 @@
 package v2
 
 import (
+	"crynux_relay/api/v2/admin"
 	"crynux_relay/api/v2/incentive"
+	"crynux_relay/api/v2/middleware"
 	"crynux_relay/api/v2/network"
 	"crynux_relay/api/v2/nodes"
 	"crynux_relay/api/v2/response"
@@ -47,5 +49,14 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Summary("Node join"),
 		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
 	}, tonic.Handler(nodes.NodeJoin, 200))
+
+	adminGroup := v2g.Group("admin", "admin", "Admin APIs")
+	adminNodesGroup := adminGroup.Group("nodes", "admin nodes", "Admin node management APIs")
+	adminNodesGroup.GET("/qos", []fizz.OperationOption{
+		fizz.ID("admin_nodes_qos_v2"),
+		fizz.Summary("Export active node QoS statistics in CSV"),
+		fizz.Response("401", "unauthorized", response.ErrorResponse{}, nil, nil),
+		fizz.Response("500", "exception", response.ExceptionResponse{}, nil, nil),
+	}, middleware.AdminAuthMiddleware(), admin.ExportNodeQosCSV)
 
 }

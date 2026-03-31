@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	TASK_SCORE_REWARDS [3]uint64 = [3]uint64{10, 5, 2}
+	TASK_SCORE_REWARDS [3]uint64        = [3]uint64{10, 5, 2}
 	nodeQoSScorePool   NodeQosScorePool = NodeQosScorePool{
 		pool: make(map[string][]uint64),
 	}
@@ -137,15 +137,20 @@ func ApplyHealthBoost(ctx context.Context, db *gorm.DB, node *models.Node) error
 // combining long-term performance and short-term reliability.
 // Returns 0 if the node should be hard-excluded.
 func CalculateQosScore(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) float64 {
+	_, _, qos := CalculateQosComponents(qosScore, healthBase, healthUpdatedAt)
+	return qos
+}
+
+// CalculateQosComponents returns long-term QoS, short-term QoS and combined QoS.
+func CalculateQosComponents(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) (float64, float64, float64) {
 	h := getEffectiveHealth(healthBase, healthUpdatedAt)
 	cfg := config.GetConfig().QoS
 	if h < cfg.ExcludeThreshold {
-		return 0 // hard exclusion
+		return 0, h, 0 // hard exclusion
 	}
-	// globalMaxQosScore is defined in selecting_prob.go, but visible here since it's the same package
-	qosLong := qosScore / globalMaxQosScore
+	qosLong := qosScore / GetMaxQosScore()
 	if qosLong == 0 {
 		qosLong = 0.5 // default for new nodes
 	}
-	return qosLong * h
+	return qosLong, h, qosLong * h
 }

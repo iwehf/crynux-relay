@@ -40,6 +40,10 @@ type AppConfig struct {
 		} `mapstructure:"jwt"`
 	} `mapstructure:"http"`
 
+	Admin struct {
+		AuthToken string `mapstructure:"auth_token"`
+	} `mapstructure:"admin"`
+
 	DataDir struct {
 		InferenceTasks string `mapstructure:"inference_tasks"`
 		SlashedTasks   string `mapstructure:"slashed_tasks"`
