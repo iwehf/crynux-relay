@@ -110,11 +110,13 @@ type AppConfig struct {
 	} `mapstructure:"mac"`
 
 	QoS struct {
-		ScorePoolSize      uint64  `mapstructure:"score_pool_size"`
-		KickoutThreshold   float64 `mapstructure:"kickout_threshold"`
-		PenaltyFactor      float64 `mapstructure:"penalty_factor"`
-		SuccessBoost       float64 `mapstructure:"success_boost"`
-		RecoveryTauMinutes float64 `mapstructure:"recovery_tau_minutes"`
-		ExcludeThreshold   float64 `mapstructure:"exclude_threshold"`
+		ScorePoolSize               uint64  `mapstructure:"score_pool_size"`
+		KickoutThreshold            float64 `mapstructure:"kickout_threshold"`
+		PenaltyFactor               float64 `mapstructure:"penalty_factor"`
+		FirstTimeoutPenaltyFactor   float64 `mapstructure:"first_timeout_penalty_factor"`
+		FirstTimeoutHealthThreshold float64 `mapstructure:"first_timeout_health_threshold"`
+		SuccessBoost                float64 `mapstructure:"success_boost"`
+		RecoveryTauMinutes          float64 `mapstructure:"recovery_tau_minutes"`
+		ExcludeThreshold            float64 `mapstructure:"exclude_threshold"`
 	} `mapstructure:"qos"`
 }

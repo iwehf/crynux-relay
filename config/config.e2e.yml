@@ -90,6 +90,8 @@ qos:
   score_pool_size: 50
   kickout_threshold: 2.0
   penalty_factor: 0.3
+  first_timeout_penalty_factor: 0.95
+  first_timeout_health_threshold: 0.99
   success_boost: 0.15
   recovery_tau_minutes: 30
   exclude_threshold: 0.1
