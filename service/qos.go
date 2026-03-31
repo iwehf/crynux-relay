@@ -104,16 +104,35 @@ func getEffectiveHealth(healthBase float64, healthUpdatedAt sql.NullTime) float6
 	return hEffective
 }
 
-// ApplyHealthPenalty is called when a task times out. It multiplies the
-// current effective health by the configured penalty factor.
-func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) error {
+func calculatePenalizedHealth(hEffective float64) float64 {
 	cfg := config.GetConfig().QoS
-	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
 	penaltyFactor := cfg.PenaltyFactor
 	if hEffective >= cfg.FirstTimeoutHealthThreshold {
 		penaltyFactor = cfg.FirstTimeoutPenaltyFactor
 	}
-	hNew := hEffective * penaltyFactor
+	return hEffective * penaltyFactor
+}
+
+func calculateBoostedHealth(hEffective float64) float64 {
+	hNew := hEffective + config.GetConfig().QoS.SuccessBoost
+	if hNew > 1.0 {
+		return 1.0
+	}
+	return hNew
+}
+
+func calculateCombinedQos(qosLong float64, health float64) float64 {
+	if health < config.GetConfig().QoS.ExcludeThreshold {
+		return 0
+	}
+	return qosLong * health
+}
+
+// ApplyHealthPenalty is called when a task times out. It multiplies the
+// current effective health by the configured penalty factor.
+func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) error {
+	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
+	hNew := calculatePenalizedHealth(hEffective)
 
 	return node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
@@ -124,12 +143,8 @@ func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) err
 // ApplyHealthBoost is called on successful task completion. It adds the
 // configured success boost to the current effective health, capped at 1.0.
 func ApplyHealthBoost(ctx context.Context, db *gorm.DB, node *models.Node) error {
-	cfg := config.GetConfig().QoS
 	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
-	hNew := hEffective + cfg.SuccessBoost
-	if hNew > 1.0 {
-		hNew = 1.0
-	}
+	hNew := calculateBoostedHealth(hEffective)
 
 	return node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
@@ -158,10 +173,6 @@ func CalculateLongTermQos(qosScore float64) float64 {
 // CalculateQosComponents returns long-term QoS, short-term QoS and combined QoS.
 func CalculateQosComponents(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) (float64, float64, float64) {
 	h := getEffectiveHealth(healthBase, healthUpdatedAt)
-	cfg := config.GetConfig().QoS
 	qosLong := CalculateLongTermQos(qosScore)
-	if h < cfg.ExcludeThreshold {
-		return qosLong, h, 0 // hard exclusion
-	}
-	return qosLong, h, qosLong * h
+	return qosLong, h, calculateCombinedQos(qosLong, h)
 }
