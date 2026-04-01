@@ -252,13 +252,15 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 	shouldLogValidationGroup := config.GetTaskValidationGroupLogger() != nil
 	var validationGroupStatusLabels []string
 	validationGroupNodeMetricsBefore := make(map[string]validationGroupNodeMetrics)
+	validationGroupNodeOrder := make([]string, 0, len(tasks))
 	if shouldLogValidationGroup {
 		validationGroupStatusLabels = collectValidationGroupStatusLabels(tasks)
-		nodeMetricsBefore, err := collectValidationGroupNodeMetricsBefore(ctx, tasks)
+		nodeMetricsBefore, orderedNodeAddresses, err := collectValidationGroupNodeMetricsBefore(ctx, tasks)
 		if err != nil {
 			log.Errorf("TaskValidationGroup: collect pre-update node metrics error: %v", err)
 		} else {
 			validationGroupNodeMetricsBefore = nodeMetricsBefore
+			validationGroupNodeOrder = orderedNodeAddresses
 		}
 	}
 
@@ -352,7 +354,7 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 		*originTasks[i] = *task
 	}
 	if shouldLogValidationGroup {
-		nodeMetricsAfter, err := collectValidationGroupNodeMetricsAfter(ctx, validationGroupNodeMetricsBefore)
+		nodeMetricsAfter, err := collectValidationGroupNodeMetricsAfter(ctx, validationGroupNodeMetricsBefore, validationGroupNodeOrder)
 		if err != nil {
 			log.Errorf("TaskValidationGroup: collect post-update node metrics error: %v", err)
 			logValidationGroupEvent(taskID, tasks[0].TaskType, validationGroupStatusLabels, nil)
