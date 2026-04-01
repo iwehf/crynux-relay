@@ -18,11 +18,11 @@ import (
 )
 
 type NodeJoinInput struct {
-	Address  string        `json:"address" path:"address" description:"address" validate:"required"`
-	GPUName  string        `json:"gpu_name" description:"gpu_name" validate:"required"`
-	GPUVram  uint64        `json:"gpu_vram" description:"gpu_vram" validate:"required"`
-	Version  string        `json:"version" description:"version" validate:"required"`
-	ModelIDs []string      `json:"model_ids" description:"node local model ids" validate:"required"`
+	Address  string   `json:"address" path:"address" description:"address" validate:"required"`
+	GPUName  string   `json:"gpu_name" description:"gpu_name" validate:"required"`
+	GPUVram  uint64   `json:"gpu_vram" description:"gpu_vram" validate:"required"`
+	Version  string   `json:"version" description:"version" validate:"required"`
+	ModelIDs []string `json:"model_ids" description:"node local model ids" validate:"required"`
 }
 
 type NodeJoinInputWithSignature struct {
@@ -62,8 +62,10 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 		}
 	}
 
+	isNewNode := false
 	node, err := models.GetNodeByAddress(c.Request.Context(), config.GetDB(), in.Address)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		isNewNode = true
 		node = &models.Node{
 			Address:      in.Address,
 			GPUName:      in.GPUName,
@@ -86,6 +88,7 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 	if node.Status != models.NodeStatusQuit {
 		return nil, response.NewValidationErrorResponse("address", "Node already joined")
 	}
+	service.AdjustNodeQosForJoin(node, isNewNode)
 
 	appConfig := config.GetConfig()
 	stakeAmount := utils.EtherToWei(big.NewInt(int64(appConfig.Task.StakeAmount)))

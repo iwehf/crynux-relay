@@ -118,6 +118,7 @@ type AppConfig struct {
 	QoS struct {
 		ScorePoolSize               uint64  `mapstructure:"score_pool_size"`
 		KickoutThreshold            float64 `mapstructure:"kickout_threshold"`
+		RejoinQosLongFloor          float64 `mapstructure:"rejoin_qos_long_floor"`
 		PenaltyFactor               float64 `mapstructure:"penalty_factor"`
 		FirstTimeoutPenaltyFactor   float64 `mapstructure:"first_timeout_penalty_factor"`
 		FirstTimeoutHealthThreshold float64 `mapstructure:"first_timeout_health_threshold"`

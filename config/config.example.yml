@@ -94,6 +94,7 @@ mac:
 qos:
   score_pool_size: 50
   kickout_threshold: 2.0
+  rejoin_qos_long_floor: 0.3
   penalty_factor: 0.3
   first_timeout_penalty_factor: 0.95
   first_timeout_health_threshold: 0.99
