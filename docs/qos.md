@@ -66,8 +66,9 @@ Tasks within a group are sorted by execution time (fastest first). The fixed sco
 | 3rd (slowest)   | 2          |
 
 Special cases:
-- Tasks that were **aborted** before the group validation receive a score of **0**.
-- If **all 3 tasks** in a group are aborted, QoS scores are set to NULL (not valid) and are **not included** in the node's rolling average.
+- A task in a validation group that reached `TaskEndAborted` before group validation receives a score of **0**.
+- A validation-group task aborted due to `TaskAbortTimeout` MUST contribute that **0** score to the selected node's rolling long-term QoS average when the same group contains at least one non-aborted task.
+- If **all 3 tasks** in a group are aborted, QoS scores are set to NULL (not valid) and are **not included** in any node's rolling average.
 
 #### Rolling Pool Mechanism
 

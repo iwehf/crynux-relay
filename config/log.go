@@ -9,12 +9,14 @@ import (
 )
 
 const (
-	defaultNodeHealthLogPath     = "data/logs/node_health.log"
-	defaultTaskAssignmentLogPath = "data/logs/task_assignment.log"
+	defaultNodeHealthLogPath          = "data/logs/node_health.log"
+	defaultTaskAssignmentLogPath      = "data/logs/task_assignment.log"
+	defaultTaskValidationGroupLogPath = "data/logs/task_validation_group.log"
 )
 
 var nodeHealthLogger *logrus.Logger
 var taskAssignmentLogger *logrus.Logger
+var taskValidationGroupLogger *logrus.Logger
 
 func InitLog(appConfig *AppConfig) error {
 
@@ -42,6 +44,7 @@ func InitLog(appConfig *AppConfig) error {
 	logrus.SetLevel(level)
 	initNodeHealthLogger(appConfig)
 	initTaskAssignmentLogger(appConfig)
+	initTaskValidationGroupLogger(appConfig)
 
 	return nil
 }
@@ -52,6 +55,10 @@ func GetNodeHealthLogger() *logrus.Logger {
 
 func GetTaskAssignmentLogger() *logrus.Logger {
 	return taskAssignmentLogger
+}
+
+func GetTaskValidationGroupLogger() *logrus.Logger {
+	return taskValidationGroupLogger
 }
 
 func initNodeHealthLogger(appConfig *AppConfig) {
@@ -76,6 +83,17 @@ func initTaskAssignmentLogger(appConfig *AppConfig) {
 	taskAssignmentLogger.SetOutput(newLogWriter(getTaskAssignmentLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
 }
 
+func initTaskValidationGroupLogger(appConfig *AppConfig) {
+	if !appConfig.Log.Features.TaskValidationGroupEnabled {
+		taskValidationGroupLogger = nil
+		return
+	}
+	taskValidationGroupLogger = logrus.New()
+	taskValidationGroupLogger.SetFormatter(&logrus.TextFormatter{})
+	taskValidationGroupLogger.SetLevel(logrus.InfoLevel)
+	taskValidationGroupLogger.SetOutput(newLogWriter(getTaskValidationGroupLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
+}
+
 func getNodeHealthLogPath(mainLogOutput string) string {
 	if mainLogOutput == "" || mainLogOutput == "stdout" || mainLogOutput == "stderr" {
 		return defaultNodeHealthLogPath
@@ -88,6 +106,13 @@ func getTaskAssignmentLogPath(mainLogOutput string) string {
 		return defaultTaskAssignmentLogPath
 	}
 	return filepath.Join(filepath.Dir(mainLogOutput), "task_assignment.log")
+}
+
+func getTaskValidationGroupLogPath(mainLogOutput string) string {
+	if mainLogOutput == "" || mainLogOutput == "stdout" || mainLogOutput == "stderr" {
+		return defaultTaskValidationGroupLogPath
+	}
+	return filepath.Join(filepath.Dir(mainLogOutput), "task_validation_group.log")
 }
 
 func newLogWriter(filename string, maxFileSize, maxDays, maxFileNum int) *lumberjack.Logger {

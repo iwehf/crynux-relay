@@ -1,0 +1,262 @@
+package service
+
+import (
+	"context"
+	"crynux_relay/config"
+	"crynux_relay/models"
+	"fmt"
+	"sort"
+	"strings"
+)
+
+type validationGroupNodeMetrics struct {
+	Address               string
+	LongTermBefore        float64
+	LongTermAfter         float64
+	LongTermScoreBefore   float64
+	LongTermScoreAfter    float64
+	QosBefore             float64
+	QosAfter              float64
+	WindowSize            int
+	StatusBefore          models.NodeStatus
+	StatusAfter           models.NodeStatus
+	SlashTriggered        bool
+	KickoutCheckTriggered bool
+}
+
+func collectValidationGroupStatusLabels(tasks []*models.InferenceTask) []string {
+	labels := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		labels = append(labels, validationGroupStatusLabel(task))
+	}
+	return labels
+}
+
+func validationGroupStatusLabel(task *models.InferenceTask) string {
+	switch task.Status {
+	case models.TaskScoreReady:
+		return "Success"
+	case models.TaskErrorReported:
+		return "ErrorReported"
+	case models.TaskEndAborted:
+		switch task.AbortReason {
+		case models.TaskAbortTimeout:
+			return "AbortedTimeout"
+		case models.TaskAbortModelDownloadFailed:
+			return "AbortedModelDownloadFailed"
+		case models.TaskAbortIncorrectResult:
+			return "AbortedIncorrectResult"
+		case models.TaskAbortTaskFeeTooLow:
+			return "AbortedTaskFeeTooLow"
+		default:
+			return "Aborted"
+		}
+	default:
+		return fmt.Sprintf("Status(%d)", task.Status)
+	}
+}
+
+func collectValidationGroupNodeMetricsBefore(ctx context.Context, tasks []*models.InferenceTask) (map[string]validationGroupNodeMetrics, error) {
+	metricsByNode := make(map[string]validationGroupNodeMetrics)
+	for _, task := range tasks {
+		if len(task.SelectedNode) == 0 {
+			continue
+		}
+		if _, ok := metricsByNode[task.SelectedNode]; ok {
+			continue
+		}
+
+		node, err := models.GetNodeByAddress(ctx, config.GetDB(), task.SelectedNode)
+		if err != nil {
+			return nil, err
+		}
+
+		metricsByNode[task.SelectedNode] = validationGroupNodeMetrics{
+			Address:             task.SelectedNode,
+			LongTermBefore:      CalculateLongTermQos(node.QOSScore),
+			LongTermScoreBefore: node.QOSScore,
+			QosBefore:           CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt),
+			StatusBefore:        node.Status,
+		}
+	}
+	return metricsByNode, nil
+}
+
+func markValidationGroupKickoutCheckNodes(tasks []*models.InferenceTask, nextStatusMap map[string]models.TaskStatus, metricsByNode map[string]validationGroupNodeMetrics) {
+	for _, task := range tasks {
+		if len(task.SelectedNode) == 0 {
+			continue
+		}
+
+		nextStatus := nextStatusMap[task.TaskIDCommitment]
+		if nextStatus != models.TaskGroupValidated &&
+			nextStatus != models.TaskEndGroupRefund &&
+			(nextStatus != models.TaskEndAborted || task.Status == models.TaskEndAborted) {
+			continue
+		}
+
+		metric, ok := metricsByNode[task.SelectedNode]
+		if !ok {
+			continue
+		}
+		metric.KickoutCheckTriggered = true
+		metricsByNode[task.SelectedNode] = metric
+	}
+}
+
+func markValidationGroupSlashedNodes(tasks []*models.InferenceTask, nextStatusMap map[string]models.TaskStatus, metricsByNode map[string]validationGroupNodeMetrics) {
+	for _, task := range tasks {
+		if len(task.SelectedNode) == 0 {
+			continue
+		}
+		if nextStatusMap[task.TaskIDCommitment] != models.TaskEndInvalidated {
+			continue
+		}
+
+		metric, ok := metricsByNode[task.SelectedNode]
+		if !ok {
+			continue
+		}
+		metric.SlashTriggered = true
+		metricsByNode[task.SelectedNode] = metric
+	}
+}
+
+func collectValidationGroupNodeMetricsAfter(ctx context.Context, before map[string]validationGroupNodeMetrics) ([]validationGroupNodeMetrics, error) {
+	addresses := make([]string, 0, len(before))
+	for address := range before {
+		addresses = append(addresses, address)
+	}
+	sort.Strings(addresses)
+
+	metrics := make([]validationGroupNodeMetrics, 0, len(addresses))
+	for _, address := range addresses {
+		node, err := models.GetNodeByAddress(ctx, config.GetDB(), address)
+		if err != nil {
+			return nil, err
+		}
+
+		entry := before[address]
+		entry.LongTermAfter = CalculateLongTermQos(node.QOSScore)
+		entry.LongTermScoreAfter = node.QOSScore
+		entry.QosAfter = CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
+		entry.WindowSize = getNodeQosWindowSize(address)
+		entry.StatusAfter = node.Status
+		metrics = append(metrics, entry)
+	}
+	return metrics, nil
+}
+
+func logValidationGroupEvent(taskID string, taskType models.TaskType, statuses []string, nodeMetrics []validationGroupNodeMetrics) {
+	logger := config.GetTaskValidationGroupLogger()
+	if logger == nil {
+		return
+	}
+
+	logger.Infof(
+		"[TaskValidationGroup] [%s] task_id=%s statuses=%s qos_long=%s qos=%s",
+		taskTypeTag(taskType),
+		taskID,
+		formatValidationGroupStatuses(statuses),
+		formatValidationGroupLongTermUpdates(nodeMetrics),
+		formatValidationGroupQosUpdates(nodeMetrics),
+	)
+
+	slashedNodes := collectValidationGroupSlashedNodes(nodeMetrics)
+	if len(slashedNodes) > 0 {
+		logger.Infof(
+			"[TaskValidationGroup] [%s] [Node Slash] task_id=%s nodes=%s",
+			taskTypeTag(taskType),
+			taskID,
+			formatValidationGroupNodeList(slashedNodes),
+		)
+	}
+
+	kickedOutNodes := collectValidationGroupKickedOutNodes(nodeMetrics)
+	if len(kickedOutNodes) == 0 {
+		return
+	}
+
+	logger.Infof(
+		"[TaskValidationGroup] [%s] [Node Kickout] task_id=%s nodes=%s",
+		taskTypeTag(taskType),
+		taskID,
+		formatValidationGroupNodeList(kickedOutNodes),
+	)
+}
+
+func formatValidationGroupStatuses(statuses []string) string {
+	return "[" + strings.Join(statuses, ", ") + "]"
+}
+
+func formatValidationGroupLongTermUpdates(nodeMetrics []validationGroupNodeMetrics) string {
+	if len(nodeMetrics) == 0 {
+		return "[]"
+	}
+	parts := make([]string, 0, len(nodeMetrics))
+	for _, metric := range nodeMetrics {
+		parts = append(parts, fmt.Sprintf(
+			"%s %.4f->%.4f (window: %d)",
+			metric.Address,
+			metric.LongTermBefore,
+			metric.LongTermAfter,
+			metric.WindowSize,
+		))
+	}
+	return "[QoS-long: " + strings.Join(parts, ", ") + "]"
+}
+
+func formatValidationGroupQosUpdates(nodeMetrics []validationGroupNodeMetrics) string {
+	if len(nodeMetrics) == 0 {
+		return "[]"
+	}
+	parts := make([]string, 0, len(nodeMetrics))
+	for _, metric := range nodeMetrics {
+		parts = append(parts, fmt.Sprintf(
+			"%s %.4f->%.4f",
+			metric.Address,
+			metric.QosBefore,
+			metric.QosAfter,
+		))
+	}
+	return "[QoS: " + strings.Join(parts, ", ") + "]"
+}
+
+func collectValidationGroupSlashedNodes(nodeMetrics []validationGroupNodeMetrics) []string {
+	slashedNodes := make([]string, 0)
+	for _, metric := range nodeMetrics {
+		if !metric.SlashTriggered {
+			continue
+		}
+		if metric.StatusAfter != models.NodeStatusQuit {
+			continue
+		}
+		slashedNodes = append(slashedNodes, metric.Address)
+	}
+	return slashedNodes
+}
+
+func collectValidationGroupKickedOutNodes(nodeMetrics []validationGroupNodeMetrics) []string {
+	cfg := config.GetConfig().QoS
+	kickedOutNodes := make([]string, 0)
+	for _, metric := range nodeMetrics {
+		if !metric.KickoutCheckTriggered {
+			continue
+		}
+		if metric.StatusAfter != models.NodeStatusQuit {
+			continue
+		}
+		if uint64(metric.WindowSize) < cfg.ScorePoolSize {
+			continue
+		}
+		if metric.LongTermScoreAfter >= cfg.KickoutThreshold {
+			continue
+		}
+		kickedOutNodes = append(kickedOutNodes, metric.Address)
+	}
+	return kickedOutNodes
+}
+
+func formatValidationGroupNodeList(nodes []string) string {
+	return "[" + strings.Join(nodes, ", ") + "]"
+}
