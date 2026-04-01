@@ -170,6 +170,22 @@ func CalculateLongTermQos(qosScore float64) float64 {
 	return qosLong
 }
 
+// AdjustNodeQosForJoin applies a small long-term QoS recovery when an existing
+// node rejoins with very low long-term QoS.
+func AdjustNodeQosForJoin(node *models.Node, isNewNode bool) {
+	if node == nil || isNewNode {
+		return
+	}
+
+	rejoinQosLongFloor := config.GetConfig().QoS.RejoinQosLongFloor
+	qosLong := CalculateLongTermQos(node.QOSScore)
+	if qosLong >= rejoinQosLongFloor {
+		return
+	}
+
+	node.QOSScore = rejoinQosLongFloor * GetMaxQosScore()
+}
+
 // CalculateQosComponents returns long-term QoS, short-term QoS and combined QoS.
 func CalculateQosComponents(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) (float64, float64, float64) {
 	h := getEffectiveHealth(healthBase, healthUpdatedAt)

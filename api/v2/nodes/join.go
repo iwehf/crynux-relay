@@ -64,8 +64,10 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 		}
 	}
 
+	isNewNode := false
 	node, err := models.GetNodeByAddress(c.Request.Context(), config.GetDB(), in.Address)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		isNewNode = true
 		node = &models.Node{
 			Network:      in.Network,
 			Address:      in.Address,
@@ -90,6 +92,7 @@ func NodeJoin(c *gin.Context, in *NodeJoinInputWithSignature) (*response.Respons
 	if node.Status != models.NodeStatusQuit {
 		return nil, response.NewValidationErrorResponse("address", "Node already joined")
 	}
+	service.AdjustNodeQosForJoin(node, isNewNode)
 
 	stakeAmount := &in.Staking.Int
 	if stakeAmount.Sign() == 0 {
