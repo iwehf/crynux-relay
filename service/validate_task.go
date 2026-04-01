@@ -134,18 +134,61 @@ func compareTaskScore(task1, task2 *models.InferenceTask, threshold uint64) bool
 		return false
 	}
 	if task1.Status == models.TaskScoreReady {
-		if task1.TaskType == models.TaskTypeSD || task1.TaskType == models.TaskTypeSDFTLora {
+		switch task1.TaskType {
+		case models.TaskTypeSD, models.TaskTypeSDFTLora:
 			h1 := hexutil.MustDecode(task1.Score)
 			h2 := hexutil.MustDecode(task2.Score)
 			return checkHammingDistance(h1, h2, threshold)
-		} else if task1.TaskType == models.TaskTypeLLM {
+		case models.TaskTypeLLM:
 			return task1.Score == task2.Score
-		} else {
+		default:
 			return false
 		}
 	} else {
 		return true
 	}
+}
+
+func assignValidationGroupQosScores(tasks []*models.InferenceTask) {
+	order := 0
+	finishedTaskCount := 0
+	for _, task := range tasks {
+		if task.Status != models.TaskEndAborted {
+			score := getTaskQosScore(order)
+			task.QOSScore = sql.NullInt64{Int64: int64(score), Valid: true}
+			order++
+			finishedTaskCount++
+			continue
+		}
+		task.QOSScore = sql.NullInt64{Int64: 0, Valid: true}
+	}
+	if finishedTaskCount == 0 {
+		for _, task := range tasks {
+			task.QOSScore = sql.NullInt64{Int64: 0, Valid: false}
+		}
+	}
+}
+
+func shouldPersistValidationGroupTimeoutQos(task *models.InferenceTask) bool {
+	return task.Status == models.TaskEndAborted &&
+		task.AbortReason == models.TaskAbortTimeout &&
+		task.QOSScore.Valid &&
+		len(task.SelectedNode) > 0
+}
+
+func persistValidationGroupAbortedTaskQos(ctx context.Context, tx *gorm.DB, task *models.InferenceTask) error {
+	if shouldPersistValidationGroupTimeoutQos(task) {
+		node, err := models.GetNodeByAddress(ctx, tx, task.SelectedNode)
+		if err != nil {
+			return err
+		}
+		if err := updateNodeQosScore(ctx, tx, node, uint64(task.QOSScore.Int64)); err != nil {
+			return err
+		}
+	}
+	return task.Update(ctx, tx, map[string]interface{}{
+		"qos_score": task.QOSScore,
+	})
 }
 
 func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask, taskID, vrfProof, publicKey string) error {
@@ -203,16 +246,7 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 		return ti < tj
 	})
 	// set task qos score
-	order := 0
-	for _, task := range tasks {
-		if task.Status != models.TaskEndAborted {
-			score := getTaskQosScore(order)
-			task.QOSScore = sql.NullInt64{Int64: int64(score), Valid: true}
-			order++
-		} else {
-			task.QOSScore = sql.NullInt64{Int64: 0, Valid: true}
-		}
-	}
+	assignValidationGroupQosScores(tasks)
 
 	// validate tasks' score
 	appConfig := config.GetConfig()
@@ -258,30 +292,26 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 			}
 			nextStatusMap[finishedTasks[0].TaskIDCommitment] = models.TaskEndInvalidated
 		}
-	} else if len(finishedTasks) == 0 {
-		// all tasks are aborted, set all qos score to null
-		for _, task := range tasks {
-			task.QOSScore = sql.NullInt64{Int64: 0, Valid: false}
-		}
 	}
 
 	if err := config.GetDB().Transaction(func(tx *gorm.DB) error {
 		for _, task := range tasks {
 			nextStatus := nextStatusMap[task.TaskIDCommitment]
 
-			if nextStatus == models.TaskEndInvalidated {
+			switch nextStatus {
+			case models.TaskEndInvalidated:
 				if err := SetTaskStatusEndInvalidated(ctx, tx, task); err != nil {
 					return err
 				}
-			} else if nextStatus == models.TaskGroupValidated {
+			case models.TaskGroupValidated:
 				if err := SetTaskStatusGroupValidated(ctx, tx, task); err != nil {
 					return err
 				}
-			} else if nextStatus == models.TaskEndGroupRefund {
+			case models.TaskEndGroupRefund:
 				if err := SetTaskStatusEndGroupRefund(ctx, tx, task); err != nil {
 					return err
 				}
-			} else {
+			default:
 				if task.Status != models.TaskEndAborted {
 					task.AbortReason = models.TaskAbortIncorrectResult
 
@@ -290,9 +320,7 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 						return err
 					}
 				} else {
-					if err := task.Update(ctx, tx, map[string]interface{}{
-						"qos_score": task.QOSScore,
-					}); err != nil {
+					if err := persistValidationGroupAbortedTaskQos(ctx, tx, task); err != nil {
 						return err
 					}
 				}

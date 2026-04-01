@@ -115,7 +115,7 @@ For tasks selected for validation (group of 3 tasks sharing the same real `TaskI
 
 1. Verify all 3 `TaskIDCommitment` values against the revealed `TaskID`.
 2. Verify the VRF proof to confirm the task was correctly classified as grouped.
-3. Sort tasks by execution time (fastest first) and assign QoS scores: 1st = 10, 2nd = 5, 3rd = 2. Aborted tasks receive 0.
+3. Sort non-aborted tasks by execution time (fastest first) and assign QoS scores: 1st = 10, 2nd = 5, 3rd = 2. Tasks already in `TaskEndAborted` receive 0.
 4. Compare results pairwise to determine the majority.
 
 ### Result Comparison
@@ -140,11 +140,15 @@ Given 3 finished tasks (A, B, C), the relay compares all pairs and assigns termi
 | A=C only (B differs) | `GroupValidated` | **`EndInvalidated`** | `GroupRefund` |
 | B=C only (A differs) | **`EndInvalidated`** | `GroupValidated` | `GroupRefund` |
 | None match | `EndAborted` | `EndAborted` | `EndAborted` |
-| All 3 aborted before scoring | QoS scores set to NULL, no validation | | |
+| All 3 aborted before scoring | QoS scores set to NULL, no long-term QoS update | | |
 
 When only 2 of 3 tasks finished (the third was aborted before scoring):
 - If the 2 finished tasks match → first gets `GroupValidated`, second gets `GroupRefund`
 - If they do not match → both get `EndAborted`
+
+Long-term QoS scoring for tasks already in `TaskEndAborted` follows these rules:
+- If the group contains at least one non-aborted task, each task aborted due to `TaskAbortTimeout` MUST contribute a Task QoS score of `0` to its selected node's long-term QoS rolling average.
+- If all 3 tasks in the group are already aborted, all 3 Task QoS scores MUST be treated as NULL and MUST NOT update any node's long-term QoS rolling average.
 
 A task reaching `EndInvalidated` triggers the **node slash** for its assigned node.
 
