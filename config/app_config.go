@@ -29,6 +29,7 @@ type AppConfig struct {
 		MaxFileNum  int    `mapstructure:"max_file_num"`
 		Features    struct {
 			NodeHealthEnabled          bool `mapstructure:"node_health_enabled"`
+			NodeStatusEnabled          bool `mapstructure:"node_status_enabled"`
 			TaskAssignmentEnabled      bool `mapstructure:"task_assignment_enabled"`
 			TaskValidationGroupEnabled bool `mapstructure:"task_validation_group_enabled"`
 		} `mapstructure:"features"`

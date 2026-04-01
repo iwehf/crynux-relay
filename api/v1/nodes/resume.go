@@ -5,6 +5,7 @@ import (
 	"crynux_relay/api/v1/validate"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/service"
 	"errors"
 
 	"github.com/gin-gonic/gin"
@@ -55,6 +56,7 @@ func NodeResume(c *gin.Context, in *ResumeInputWithSignature) (*response.Respons
 
 		err = node.Update(c.Request.Context(), config.GetDB(), map[string]interface{}{"status": models.NodeStatusAvailable})
 		if err == nil {
+			service.LogNodeStatusChange(node, "resume")
 			break
 		} else if errors.Is(err, models.ErrNodeStatusChanged) {
 			if err := node.SyncStatus(c.Request.Context(), config.GetDB()); err != nil {

@@ -5,12 +5,13 @@ import (
 	"crynux_relay/config"
 	"crynux_relay/models"
 	"fmt"
-	"sort"
 	"strings"
 )
 
 type validationGroupNodeMetrics struct {
 	Address               string
+	GPUName               string
+	GPUVram               uint64
 	LongTermBefore        float64
 	LongTermAfter         float64
 	LongTermScoreBefore   float64
@@ -56,8 +57,9 @@ func validationGroupStatusLabel(task *models.InferenceTask) string {
 	}
 }
 
-func collectValidationGroupNodeMetricsBefore(ctx context.Context, tasks []*models.InferenceTask) (map[string]validationGroupNodeMetrics, error) {
+func collectValidationGroupNodeMetricsBefore(ctx context.Context, tasks []*models.InferenceTask) (map[string]validationGroupNodeMetrics, []string, error) {
 	metricsByNode := make(map[string]validationGroupNodeMetrics)
+	orderedNodeAddresses := make([]string, 0, len(tasks))
 	for _, task := range tasks {
 		if len(task.SelectedNode) == 0 {
 			continue
@@ -68,18 +70,21 @@ func collectValidationGroupNodeMetricsBefore(ctx context.Context, tasks []*model
 
 		node, err := models.GetNodeByAddress(ctx, config.GetDB(), task.SelectedNode)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		metricsByNode[task.SelectedNode] = validationGroupNodeMetrics{
 			Address:             task.SelectedNode,
+			GPUName:             node.GPUName,
+			GPUVram:             node.GPUVram,
 			LongTermBefore:      CalculateLongTermQos(node.QOSScore),
 			LongTermScoreBefore: node.QOSScore,
 			QosBefore:           CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt),
 			StatusBefore:        node.Status,
 		}
+		orderedNodeAddresses = append(orderedNodeAddresses, task.SelectedNode)
 	}
-	return metricsByNode, nil
+	return metricsByNode, orderedNodeAddresses, nil
 }
 
 func markValidationGroupKickoutCheckNodes(tasks []*models.InferenceTask, nextStatusMap map[string]models.TaskStatus, metricsByNode map[string]validationGroupNodeMetrics) {
@@ -122,15 +127,9 @@ func markValidationGroupSlashedNodes(tasks []*models.InferenceTask, nextStatusMa
 	}
 }
 
-func collectValidationGroupNodeMetricsAfter(ctx context.Context, before map[string]validationGroupNodeMetrics) ([]validationGroupNodeMetrics, error) {
-	addresses := make([]string, 0, len(before))
-	for address := range before {
-		addresses = append(addresses, address)
-	}
-	sort.Strings(addresses)
-
-	metrics := make([]validationGroupNodeMetrics, 0, len(addresses))
-	for _, address := range addresses {
+func collectValidationGroupNodeMetricsAfter(ctx context.Context, before map[string]validationGroupNodeMetrics, orderedNodeAddresses []string) ([]validationGroupNodeMetrics, error) {
+	metrics := make([]validationGroupNodeMetrics, 0, len(orderedNodeAddresses))
+	for _, address := range orderedNodeAddresses {
 		node, err := models.GetNodeByAddress(ctx, config.GetDB(), address)
 		if err != nil {
 			return nil, err
@@ -142,6 +141,8 @@ func collectValidationGroupNodeMetricsAfter(ctx context.Context, before map[stri
 		entry.QosAfter = CalculateQosScore(node.QOSScore, node.HealthBase, node.HealthUpdatedAt)
 		entry.WindowSize = getNodeQosWindowSize(address)
 		entry.StatusAfter = node.Status
+		entry.GPUName = node.GPUName
+		entry.GPUVram = node.GPUVram
 		metrics = append(metrics, entry)
 	}
 	return metrics, nil
@@ -164,12 +165,16 @@ func logValidationGroupEvent(taskID string, taskType models.TaskType, statuses [
 
 	slashedNodes := collectValidationGroupSlashedNodes(nodeMetrics)
 	if len(slashedNodes) > 0 {
-		logger.Infof(
-			"[TaskValidationGroup] [%s] [Node Slash] task_id=%s nodes=%s",
-			taskTypeTag(taskType),
-			taskID,
-			formatValidationGroupNodeList(slashedNodes),
-		)
+		for _, node := range slashedNodes {
+			logger.Infof(
+				"[TaskValidationGroup] [%s] [Node Slash] task_id=%s node=%s card=%q vram=%dGB",
+				taskTypeTag(taskType),
+				taskID,
+				node.Address,
+				node.GPUName,
+				node.GPUVram,
+			)
+		}
 	}
 
 	kickedOutNodes := collectValidationGroupKickedOutNodes(nodeMetrics)
@@ -177,12 +182,16 @@ func logValidationGroupEvent(taskID string, taskType models.TaskType, statuses [
 		return
 	}
 
-	logger.Infof(
-		"[TaskValidationGroup] [%s] [Node Kickout] task_id=%s nodes=%s",
-		taskTypeTag(taskType),
-		taskID,
-		formatValidationGroupNodeList(kickedOutNodes),
-	)
+	for _, node := range kickedOutNodes {
+		logger.Infof(
+			"[TaskValidationGroup] [%s] [Node Kickout] task_id=%s node=%s card=%q vram=%dGB",
+			taskTypeTag(taskType),
+			taskID,
+			node.Address,
+			node.GPUName,
+			node.GPUVram,
+		)
+	}
 }
 
 func formatValidationGroupStatuses(statuses []string) string {
@@ -196,11 +205,10 @@ func formatValidationGroupLongTermUpdates(nodeMetrics []validationGroupNodeMetri
 	parts := make([]string, 0, len(nodeMetrics))
 	for _, metric := range nodeMetrics {
 		parts = append(parts, fmt.Sprintf(
-			"%s %.4f->%.4f (window: %d)",
+			"%s %.4f->%.4f",
 			metric.Address,
 			metric.LongTermBefore,
 			metric.LongTermAfter,
-			metric.WindowSize,
 		))
 	}
 	return "[QoS-long: " + strings.Join(parts, ", ") + "]"
@@ -222,8 +230,8 @@ func formatValidationGroupQosUpdates(nodeMetrics []validationGroupNodeMetrics) s
 	return "[QoS: " + strings.Join(parts, ", ") + "]"
 }
 
-func collectValidationGroupSlashedNodes(nodeMetrics []validationGroupNodeMetrics) []string {
-	slashedNodes := make([]string, 0)
+func collectValidationGroupSlashedNodes(nodeMetrics []validationGroupNodeMetrics) []validationGroupNodeMetrics {
+	slashedNodes := make([]validationGroupNodeMetrics, 0)
 	for _, metric := range nodeMetrics {
 		if !metric.SlashTriggered {
 			continue
@@ -231,14 +239,14 @@ func collectValidationGroupSlashedNodes(nodeMetrics []validationGroupNodeMetrics
 		if metric.StatusAfter != models.NodeStatusQuit {
 			continue
 		}
-		slashedNodes = append(slashedNodes, metric.Address)
+		slashedNodes = append(slashedNodes, metric)
 	}
 	return slashedNodes
 }
 
-func collectValidationGroupKickedOutNodes(nodeMetrics []validationGroupNodeMetrics) []string {
+func collectValidationGroupKickedOutNodes(nodeMetrics []validationGroupNodeMetrics) []validationGroupNodeMetrics {
 	cfg := config.GetConfig().QoS
-	kickedOutNodes := make([]string, 0)
+	kickedOutNodes := make([]validationGroupNodeMetrics, 0)
 	for _, metric := range nodeMetrics {
 		if !metric.KickoutCheckTriggered {
 			continue
@@ -252,11 +260,7 @@ func collectValidationGroupKickedOutNodes(nodeMetrics []validationGroupNodeMetri
 		if metric.LongTermScoreAfter >= cfg.KickoutThreshold {
 			continue
 		}
-		kickedOutNodes = append(kickedOutNodes, metric.Address)
+		kickedOutNodes = append(kickedOutNodes, metric)
 	}
 	return kickedOutNodes
-}
-
-func formatValidationGroupNodeList(nodes []string) string {
-	return "[" + strings.Join(nodes, ", ") + "]"
 }
