@@ -5,6 +5,7 @@ import (
 	"crynux_relay/api/v1/validate"
 	"crynux_relay/config"
 	"crynux_relay/models"
+	"crynux_relay/service"
 	"errors"
 
 	"github.com/gin-gonic/gin"
@@ -61,6 +62,7 @@ func NodePause(c *gin.Context, in *PauseInputWithSignature) (*response.Response,
 
 		err = node.Update(c.Request.Context(), config.GetDB(), map[string]interface{}{"status": status})
 		if err == nil {
+			service.LogNodeStatusChange(node, "pause")
 			break
 		} else if errors.Is(err, models.ErrNodeStatusChanged) {
 			if err := node.SyncStatus(c.Request.Context(), config.GetDB()); err != nil {

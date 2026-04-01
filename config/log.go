@@ -10,11 +10,13 @@ import (
 
 const (
 	defaultNodeHealthLogPath          = "data/logs/node_health.log"
+	defaultNodeStatusLogPath          = "data/logs/node_status.log"
 	defaultTaskAssignmentLogPath      = "data/logs/task_assignment.log"
 	defaultTaskValidationGroupLogPath = "data/logs/task_validation_group.log"
 )
 
 var nodeHealthLogger *logrus.Logger
+var nodeStatusLogger *logrus.Logger
 var taskAssignmentLogger *logrus.Logger
 var taskValidationGroupLogger *logrus.Logger
 
@@ -43,6 +45,7 @@ func InitLog(appConfig *AppConfig) error {
 
 	logrus.SetLevel(level)
 	initNodeHealthLogger(appConfig)
+	initNodeStatusLogger(appConfig)
 	initTaskAssignmentLogger(appConfig)
 	initTaskValidationGroupLogger(appConfig)
 
@@ -55,6 +58,10 @@ func GetNodeHealthLogger() *logrus.Logger {
 
 func GetTaskAssignmentLogger() *logrus.Logger {
 	return taskAssignmentLogger
+}
+
+func GetNodeStatusLogger() *logrus.Logger {
+	return nodeStatusLogger
 }
 
 func GetTaskValidationGroupLogger() *logrus.Logger {
@@ -70,6 +77,17 @@ func initNodeHealthLogger(appConfig *AppConfig) {
 	nodeHealthLogger.SetFormatter(&logrus.TextFormatter{})
 	nodeHealthLogger.SetLevel(logrus.InfoLevel)
 	nodeHealthLogger.SetOutput(newLogWriter(getNodeHealthLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
+}
+
+func initNodeStatusLogger(appConfig *AppConfig) {
+	if !appConfig.Log.Features.NodeStatusEnabled {
+		nodeStatusLogger = nil
+		return
+	}
+	nodeStatusLogger = logrus.New()
+	nodeStatusLogger.SetFormatter(&logrus.TextFormatter{})
+	nodeStatusLogger.SetLevel(logrus.InfoLevel)
+	nodeStatusLogger.SetOutput(newLogWriter(getNodeStatusLogPath(appConfig.Log.Output), appConfig.Log.MaxFileSize, appConfig.Log.MaxDays, appConfig.Log.MaxFileNum))
 }
 
 func initTaskAssignmentLogger(appConfig *AppConfig) {
@@ -99,6 +117,13 @@ func getNodeHealthLogPath(mainLogOutput string) string {
 		return defaultNodeHealthLogPath
 	}
 	return filepath.Join(filepath.Dir(mainLogOutput), "node_health.log")
+}
+
+func getNodeStatusLogPath(mainLogOutput string) string {
+	if mainLogOutput == "" || mainLogOutput == "stdout" || mainLogOutput == "stderr" {
+		return defaultNodeStatusLogPath
+	}
+	return filepath.Join(filepath.Dir(mainLogOutput), "node_status.log")
 }
 
 func getTaskAssignmentLogPath(mainLogOutput string) string {

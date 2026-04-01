@@ -21,6 +21,22 @@ func TestGetNodeHealthLogPath_BasedOnMainLogDir(t *testing.T) {
 	}
 }
 
+func TestGetNodeStatusLogPath_DefaultPath(t *testing.T) {
+	tests := []string{"", "stdout", "stderr"}
+	for _, output := range tests {
+		if got := getNodeStatusLogPath(output); got != defaultNodeStatusLogPath {
+			t.Fatalf("expected default path for output %q, got %q", output, got)
+		}
+	}
+}
+
+func TestGetNodeStatusLogPath_BasedOnMainLogDir(t *testing.T) {
+	got := getNodeStatusLogPath("data/logs/relay.log")
+	if got != filepath.Join("data", "logs", "node_status.log") {
+		t.Fatalf("expected node status log path in same directory, got %q", got)
+	}
+}
+
 func TestGetTaskAssignmentLogPath_DefaultPath(t *testing.T) {
 	tests := []string{"", "stdout", "stderr"}
 	for _, output := range tests {
@@ -101,6 +117,32 @@ func TestInitTaskAssignmentLogger_Disabled(t *testing.T) {
 
 	if taskAssignmentLogger != nil {
 		t.Fatal("expected task assignment logger to be nil when disabled")
+	}
+}
+
+func TestInitNodeStatusLogger_Disabled(t *testing.T) {
+	nodeStatusLogger = nil
+
+	cfg := &AppConfig{}
+	cfg.Log.Features.NodeStatusEnabled = false
+
+	initNodeStatusLogger(cfg)
+
+	if nodeStatusLogger != nil {
+		t.Fatal("expected node status logger to be nil when disabled")
+	}
+}
+
+func TestInitNodeStatusLogger_Enabled(t *testing.T) {
+	nodeStatusLogger = nil
+
+	cfg := &AppConfig{}
+	cfg.Log.Features.NodeStatusEnabled = true
+
+	initNodeStatusLogger(cfg)
+
+	if nodeStatusLogger == nil {
+		t.Fatal("expected node status logger to be initialized when enabled")
 	}
 }
 

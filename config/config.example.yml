@@ -17,6 +17,7 @@ log:
   max_file_num: 5
   features:
     node_health_enabled: false
+    node_status_enabled: false
     task_assignment_enabled: false
     task_validation_group_enabled: false
 http:

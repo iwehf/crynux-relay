@@ -67,6 +67,7 @@ func SetNodeStatusJoin(ctx context.Context, db *gorm.DB, node *models.Node, mode
 		return err
 	}
 	UpdateMaxStaking(&node.StakeAmount.Int)
+	LogNodeStatusChange(node, "join")
 	return nil
 }
 
@@ -190,23 +191,36 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		}); err != nil {
 			return err
 		}
+		LogNodeStatusChange(node, "kickout")
 		logNodeKickoutHealthEvent(node, task, healthMetrics)
 		return nil
 	}
 
 	switch node.Status {
 	case models.NodeStatusBusy:
-		return node.Update(ctx, db, map[string]interface{}{
+		if err := node.Update(ctx, db, map[string]interface{}{
 			"status":                     models.NodeStatusAvailable,
 			"current_task_id_commitment": sql.NullString{Valid: false},
-		})
+		}); err != nil {
+			return err
+		}
+		LogNodeStatusChange(node, "resume")
+		return nil
 	case models.NodeStatusPendingQuit:
-		return SetNodeStatusQuit(ctx, db, node, false)
+		if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
+			return err
+		}
+		LogNodeStatusChange(node, "quit")
+		return nil
 	case models.NodeStatusPendingPause:
-		return node.Update(ctx, db, map[string]interface{}{
+		if err := node.Update(ctx, db, map[string]interface{}{
 			"status":                     models.NodeStatusPaused,
 			"current_task_id_commitment": sql.NullString{Valid: false},
-		})
+		}); err != nil {
+			return err
+		}
+		LogNodeStatusChange(node, "pause")
+		return nil
 	}
 	return nil
 }
@@ -223,6 +237,7 @@ func nodeSlash(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		if err := SetNodeStatusQuit(ctx, db, node, true); err != nil {
 			return err
 		}
+		LogNodeStatusChange(node, "slashed")
 		return emitEvent(ctx, db, &models.NodeSlashedEvent{NodeAddress: node.Address, TaskIDCommitment: taskIDCommitment})
 	})
 }
