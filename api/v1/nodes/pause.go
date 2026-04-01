@@ -62,7 +62,9 @@ func NodePause(c *gin.Context, in *PauseInputWithSignature) (*response.Response,
 
 		err = node.Update(c.Request.Context(), config.GetDB(), map[string]interface{}{"status": status})
 		if err == nil {
-			service.LogNodeStatusChange(node, "pause")
+			if status == models.NodeStatusPaused {
+				service.LogNodeStatusChange(node, "pause")
+			}
 			break
 		} else if errors.Is(err, models.ErrNodeStatusChanged) {
 			if err := node.SyncStatus(c.Request.Context(), config.GetDB()); err != nil {

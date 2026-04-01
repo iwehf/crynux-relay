@@ -204,7 +204,6 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 		}); err != nil {
 			return err
 		}
-		LogNodeStatusChange(node, "resume")
 		return nil
 	case models.NodeStatusPendingQuit:
 		if err := SetNodeStatusQuit(ctx, db, node, false); err != nil {
