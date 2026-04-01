@@ -13,6 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	log "github.com/sirupsen/logrus"
 	"github.com/vechain/go-ecvrf"
 	"gorm.io/gorm"
 )
@@ -248,6 +249,19 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 	// set task qos score
 	assignValidationGroupQosScores(tasks)
 
+	shouldLogValidationGroup := config.GetTaskValidationGroupLogger() != nil
+	var validationGroupStatusLabels []string
+	validationGroupNodeMetricsBefore := make(map[string]validationGroupNodeMetrics)
+	if shouldLogValidationGroup {
+		validationGroupStatusLabels = collectValidationGroupStatusLabels(tasks)
+		nodeMetricsBefore, err := collectValidationGroupNodeMetricsBefore(ctx, tasks)
+		if err != nil {
+			log.Errorf("TaskValidationGroup: collect pre-update node metrics error: %v", err)
+		} else {
+			validationGroupNodeMetricsBefore = nodeMetricsBefore
+		}
+	}
+
 	// validate tasks' score
 	appConfig := config.GetConfig()
 
@@ -293,6 +307,10 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 			nextStatusMap[finishedTasks[0].TaskIDCommitment] = models.TaskEndInvalidated
 		}
 	}
+	if shouldLogValidationGroup {
+		markValidationGroupSlashedNodes(tasks, nextStatusMap, validationGroupNodeMetricsBefore)
+		markValidationGroupKickoutCheckNodes(tasks, nextStatusMap, validationGroupNodeMetricsBefore)
+	}
 
 	if err := config.GetDB().Transaction(func(tx *gorm.DB) error {
 		for _, task := range tasks {
@@ -332,6 +350,15 @@ func ValidateTaskGroup(ctx context.Context, originTasks []*models.InferenceTask,
 	}
 	for i, task := range tasks {
 		*originTasks[i] = *task
+	}
+	if shouldLogValidationGroup {
+		nodeMetricsAfter, err := collectValidationGroupNodeMetricsAfter(ctx, validationGroupNodeMetricsBefore)
+		if err != nil {
+			log.Errorf("TaskValidationGroup: collect post-update node metrics error: %v", err)
+			logValidationGroupEvent(taskID, tasks[0].TaskType, validationGroupStatusLabels, nil)
+		} else {
+			logValidationGroupEvent(taskID, tasks[0].TaskType, validationGroupStatusLabels, nodeMetricsAfter)
+		}
 	}
 	return nil
 }

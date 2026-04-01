@@ -37,6 +37,22 @@ func TestGetTaskAssignmentLogPath_BasedOnMainLogDir(t *testing.T) {
 	}
 }
 
+func TestGetTaskValidationGroupLogPath_DefaultPath(t *testing.T) {
+	tests := []string{"", "stdout", "stderr"}
+	for _, output := range tests {
+		if got := getTaskValidationGroupLogPath(output); got != defaultTaskValidationGroupLogPath {
+			t.Fatalf("expected default path for output %q, got %q", output, got)
+		}
+	}
+}
+
+func TestGetTaskValidationGroupLogPath_BasedOnMainLogDir(t *testing.T) {
+	got := getTaskValidationGroupLogPath("data/logs/relay.log")
+	if got != filepath.Join("data", "logs", "task_validation_group.log") {
+		t.Fatalf("expected task validation group log path in same directory, got %q", got)
+	}
+}
+
 func TestInitNodeHealthLogger_DefaultDisabled(t *testing.T) {
 	nodeHealthLogger = nil
 
@@ -98,5 +114,31 @@ func TestInitTaskAssignmentLogger_Enabled(t *testing.T) {
 
 	if taskAssignmentLogger == nil {
 		t.Fatal("expected task assignment logger to be initialized when enabled")
+	}
+}
+
+func TestInitTaskValidationGroupLogger_Disabled(t *testing.T) {
+	taskValidationGroupLogger = nil
+
+	cfg := &AppConfig{}
+	cfg.Log.Features.TaskValidationGroupEnabled = false
+
+	initTaskValidationGroupLogger(cfg)
+
+	if taskValidationGroupLogger != nil {
+		t.Fatal("expected task validation group logger to be nil when disabled")
+	}
+}
+
+func TestInitTaskValidationGroupLogger_Enabled(t *testing.T) {
+	taskValidationGroupLogger = nil
+
+	cfg := &AppConfig{}
+	cfg.Log.Features.TaskValidationGroupEnabled = true
+
+	initTaskValidationGroupLogger(cfg)
+
+	if taskValidationGroupLogger == nil {
+		t.Fatal("expected task validation group logger to be initialized when enabled")
 	}
 }

@@ -176,3 +176,10 @@ func CalculateQosComponents(qosScore float64, healthBase float64, healthUpdatedA
 	qosLong := CalculateLongTermQos(qosScore)
 	return qosLong, h, calculateCombinedQos(qosLong, h)
 }
+
+func getNodeQosWindowSize(nodeAddress string) int {
+	nodeQoSScorePool.mu.RLock()
+	defer nodeQoSScorePool.mu.RUnlock()
+
+	return len(nodeQoSScorePool.pool[nodeAddress])
+}
