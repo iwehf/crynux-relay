@@ -18,7 +18,7 @@ In the codebase, "QoS" may refer to either the persisted long-term performance s
 |-------------|----------------|
 | `models.Node.QOSScore` | `Q_long`, the persisted long-term performance score (not the final runtime QoS) |
 | `CalculateQosScore(qosScore, healthBase, healthUpdatedAt)` parameter `qosScore` | `Q_long` loaded from `models.Node.QOSScore` |
-| `CalculateQosScore(...)` return value | final runtime QoS used for selection (after hard exclusion) |
+| `CalculateQosScore(...)` return value | final runtime QoS used for selection |
 
 In short: the database field named `QOSScore` stores long-term performance only, while the final runtime QoS is computed by combining normalized `Q_long` with effective health `H`.
 
@@ -107,9 +107,9 @@ Default behavior example:
 - 1 timeout from full health: `1.00 -> 0.95` (light penalty)
 - 2nd consecutive timeout: `0.95 -> 0.285` (heavy penalty begins)
 
-#### Hard Exclusion
+#### Health-Based Kickout
 
-When a node's health drops below the **exclusion threshold** (`0.1`), its final QoS score is forced to **0**. The node is effectively excluded from receiving tasks until it recovers. Under default penalty settings, this occurs after the heavy-penalty stage drives health below the threshold.
+When a node's effective health drops below the **health kickout threshold** (`0.1`), the relay MUST kick the node out when the current task finishes. The node leaves the candidate set because its status becomes `Quit`, not because runtime QoS is clamped to zero. Under default penalty settings, this occurs after the heavy-penalty stage drives health below the threshold.
 
 #### Recovery
 
@@ -133,7 +133,7 @@ The penalty is temporary. Health recovers via two mechanisms:
 | `qos.first_timeout_health_threshold` | 0.99 | Health threshold that determines whether timeout uses light or heavy penalty |
 | `qos.success_boost` | 0.15 | Additive boost to H on success |
 | `qos.recovery_tau_minutes` | 30 | Time constant used for passive health recovery |
-| `qos.exclude_threshold` | 0.1 | H value below which QoS becomes 0 (excluded) |
+| `qos.health_kickout_threshold` | 0.1 | H value below which the node is kicked out when the current task finishes |
 
 ## Relevant Source Files
 

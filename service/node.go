@@ -176,7 +176,7 @@ func nodeFinishTask(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	}
 	taskIDCommitment := node.CurrentTaskIDCommitment.String
 
-	// QoS-based permanent kickout check
+	// Kick out nodes that breach the configured permanent kickout conditions.
 	if ShouldPermanentKickout(node) {
 		task, err := models.GetTaskByIDCommitment(ctx, db, taskIDCommitment)
 		if err != nil {

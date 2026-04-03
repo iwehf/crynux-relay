@@ -100,4 +100,4 @@ qos:
   first_timeout_health_threshold: 0.99
   success_boost: 0.15
   recovery_tau_minutes: 30
-  exclude_threshold: 0.1
+  health_kickout_threshold: 0.1
