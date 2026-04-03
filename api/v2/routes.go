@@ -58,5 +58,12 @@ func InitRoutes(r *fizz.Fizz) {
 		fizz.Response("401", "unauthorized", response.ErrorResponse{}, nil, nil),
 		fizz.Response("500", "exception", response.ExceptionResponse{}, nil, nil),
 	}, middleware.AdminAuthMiddleware(), admin.ExportNodeQosCSV)
+	adminNodesGroup.GET("/tasks/history", []fizz.OperationOption{
+		fizz.ID("admin_nodes_task_history_v2"),
+		fizz.Summary("Render node task history in HTML"),
+		fizz.Response("400", "validation errors", response.ValidationErrorResponse{}, nil, nil),
+		fizz.Response("401", "unauthorized", response.ErrorResponse{}, nil, nil),
+		fizz.Response("500", "exception", response.ExceptionResponse{}, nil, nil),
+	}, middleware.AdminAuthMiddleware(), admin.ExportNodeTaskHistoryHTML)
 
 }
