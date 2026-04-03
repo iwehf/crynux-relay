@@ -60,17 +60,23 @@ func getNodeTaskQosScore(node *models.Node, qos uint64) (float64, error) {
 	return float64(sum) / float64(len(qosScorePool)), nil
 }
 
-// ShouldPermanentKickout returns true if the node's QoS score is below the
-// configured kickout threshold and the QoS score pool has enough samples.
+// ShouldPermanentKickout returns true if the node should be kicked out by
+// either long-term QoS or qos short threshold.
 func ShouldPermanentKickout(node *models.Node) bool {
+	if node == nil {
+		return false
+	}
 	cfg := config.GetConfig().QoS
-	poolSize := cfg.ScorePoolSize
+	if getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt) < cfg.HealthKickoutThreshold {
+		return true
+	}
 
+	poolSize := cfg.ScorePoolSize
 	nodeQoSScorePool.mu.RLock()
 	qosScorePool, ok := nodeQoSScorePool.pool[node.Address]
 	nodeQoSScorePool.mu.RUnlock()
 
-	// Only kick out if we have enough samples
+	// Only apply long-term QoS kickout if we have enough samples.
 	if !ok || uint64(len(qosScorePool)) < poolSize {
 		return false
 	}
@@ -122,9 +128,6 @@ func calculateBoostedHealth(hEffective float64) float64 {
 }
 
 func calculateCombinedQos(qosLong float64, health float64) float64 {
-	if health < config.GetConfig().QoS.ExcludeThreshold {
-		return 0
-	}
 	return qosLong * health
 }
 
@@ -133,11 +136,17 @@ func calculateCombinedQos(qosLong float64, health float64) float64 {
 func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
 	hNew := calculatePenalizedHealth(hEffective)
+	updatedAt := sql.NullTime{Time: time.Now(), Valid: true}
 
-	return node.Update(ctx, db, map[string]interface{}{
+	if err := node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
-		"health_updated_at": sql.NullTime{Time: time.Now(), Valid: true},
-	})
+		"health_updated_at": updatedAt,
+	}); err != nil {
+		return err
+	}
+	node.HealthBase = hNew
+	node.HealthUpdatedAt = updatedAt
+	return nil
 }
 
 // ApplyHealthBoost is called on successful task completion. It adds the
@@ -145,16 +154,21 @@ func ApplyHealthPenalty(ctx context.Context, db *gorm.DB, node *models.Node) err
 func ApplyHealthBoost(ctx context.Context, db *gorm.DB, node *models.Node) error {
 	hEffective := getEffectiveHealth(node.HealthBase, node.HealthUpdatedAt)
 	hNew := calculateBoostedHealth(hEffective)
+	updatedAt := sql.NullTime{Time: time.Now(), Valid: true}
 
-	return node.Update(ctx, db, map[string]interface{}{
+	if err := node.Update(ctx, db, map[string]interface{}{
 		"health_base":       hNew,
-		"health_updated_at": sql.NullTime{Time: time.Now(), Valid: true},
-	})
+		"health_updated_at": updatedAt,
+	}); err != nil {
+		return err
+	}
+	node.HealthBase = hNew
+	node.HealthUpdatedAt = updatedAt
+	return nil
 }
 
 // CalculateQosScore returns the node's current QoS score (0 to 1),
 // combining long-term performance and short-term reliability.
-// Returns 0 if the node should be hard-excluded.
 func CalculateQosScore(qosScore float64, healthBase float64, healthUpdatedAt sql.NullTime) float64 {
 	_, _, qos := CalculateQosComponents(qosScore, healthBase, healthUpdatedAt)
 	return qos

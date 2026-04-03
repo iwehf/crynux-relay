@@ -124,6 +124,6 @@ type AppConfig struct {
 		FirstTimeoutHealthThreshold float64 `mapstructure:"first_timeout_health_threshold"`
 		SuccessBoost                float64 `mapstructure:"success_boost"`
 		RecoveryTauMinutes          float64 `mapstructure:"recovery_tau_minutes"`
-		ExcludeThreshold            float64 `mapstructure:"exclude_threshold"`
+		HealthKickoutThreshold      float64 `mapstructure:"health_kickout_threshold"`
 	} `mapstructure:"qos"`
 }

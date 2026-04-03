@@ -201,7 +201,7 @@ Tasks can be aborted for several reasons:
 
 When a task is aborted:
 - The task fee is refunded to the creator.
-- If the abort reason is `TaskAbortTimeout` and the node never submitted a score, a **health penalty** is applied to the node's short-term reliability factor (see QoS documentation).
+- If the abort reason is `TaskAbortTimeout` and the node never submitted a score, a **health penalty** is applied to the node's short-term reliability factor. If the updated health is below `qos.health_kickout_threshold`, the relay MUST kick the node out when the current task finishes.
 
 ## Error Reporting
 
@@ -215,6 +215,7 @@ Nodes can report execution errors (e.g., invalid task parameters) via the `Repor
 | `task.distance_threshold` | Maximum Hamming distance per 8-byte pHash block for SD result comparison |
 | `qos.score_pool_size` | Number of task scores in the rolling QoS pool (default: 50) |
 | `qos.kickout_threshold` | QoS score below which a node is permanently kicked out |
+| `qos.health_kickout_threshold` | Health threshold below which a timeouted node is kicked out when the task finishes |
 
 ## Relevant Source Files
 
